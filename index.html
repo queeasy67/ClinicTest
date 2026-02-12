@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>QueEasy Pro | Bilingual Command</title>
+    
+    <!-- Core Libraries -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com" rel="stylesheet">
     <script src="https://unpkg.com"></script>
@@ -12,6 +14,7 @@
     <script src="https://www.gstatic.com"></script>
     <script src="https://www.gstatic.com"></script>
     <link href="https://cdn.jsdelivr.net" rel="stylesheet">
+
     <style>
         :root { --accent: #3b82f6; --surface: #ffffff; --bg: #f8fafc; }
         body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: #0f172a; height: 100vh; overflow: hidden; margin: 0; }
@@ -29,7 +32,9 @@
 </head>
 <body>
     <div id="root"></div>
+
     <script type="text/babel">
+        // Step 1: Firebase Configuration
         const FIREBASE_CONFIG = {
             apiKey: "AIzaSyDZ6K02v3Ovwo7xLqL4x33sIQNzv3ydXL8",
             authDomain: "queueasy-ea33b.firebaseapp.com",
@@ -38,9 +43,12 @@
             messagingSenderId: "507246685294",
             appId: "1:507246685294:web:958210e662e481e021ca7f"
         };
+
+        // Step 2: Initialize Firebase
         if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
         const db = firebase.firestore();
 
+        // Step 3: Main Application Component
         const App = () => {
             const [view, setView] = React.useState('tv');
             const [lang, setLang] = React.useState('en');
@@ -56,6 +64,7 @@
             const lastCallRef = React.useRef(0);
             const chime = new Audio('https://assets.mixkit.co');
 
+            // Data Sync
             React.useEffect(() => {
                 const unsubQ = db.collection("queue").orderBy("time", "desc").limit(20)
                     .onSnapshot(snap => setQueue(snap.docs.map(d => ({id: d.id, ...d.data()}))));
@@ -64,9 +73,11 @@
                 return () => { unsubQ(); unsubC(); };
             }, []);
 
+            // Bilingual Voice Engine
             const playVoice = (num, room) => {
                 if(!audioUnlocked) return;
                 const parse = (t, n, r) => t.replace('{number}', n).replace('{room}', r.replace('Room ', ''));
+                
                 chime.play().then(() => {
                     const en = new SpeechSynthesisUtterance(parse(config.templateEn, num, room));
                     en.lang = 'en-US';
@@ -87,42 +98,78 @@
                 }
             }, [currentCaller, view]);
 
-            return React.createElement("div", { className: "h-screen w-screen relative" },
-                view === 'tv' ? React.createElement("div", { className: "h-full tv-screen flex flex-col" },
-                    !audioUnlocked && React.createElement("div", { className: "absolute inset-0 z-50 bg-black/90 flex items-center justify-center" },
-                        React.createElement("button", { onClick: () => {setAudioUnlocked(true); chime.play();}, className: "bg-blue-600 text-white px-10 py-5 rounded-full font-black text-xl" }, "START AUDIO")
-                    ),
-                    React.createElement("div", { className: "flex justify-between items-center px-12 py-8 cyber-panel rounded-none" },
-                        React.createElement("h1", { className: "text-3xl font-black" }, config.header),
-                        React.createElement("div", { className: "text-3xl font-black mono-num" }, new Date().toLocaleTimeString())
-                    ),
-                    React.createElement("div", { className: "flex-1 flex flex-col items-center justify-center text-center" },
-                        currentCaller ? React.createElement("div", null,
-                            React.createElement("p", { className: "text-blue-400 font-black tracking-widest uppercase mb-4" }, "Now Calling"),
-                            React.createElement("h1", { className: "text-[12rem] font-black hero-glow mono-num" }, currentCaller.num),
-                            React.createElement("div", { className: "inline-block bg-white text-black px-12 py-4 rounded-2xl text-5xl font-black mt-8" }, currentCaller.loc)
-                        ) : React.createElement("p", { className: "text-4xl font-black opacity-10" }, "STANDING BY")
-                    ),
-                    React.createElement("div", { className: "ticker-bar" }, React.createElement("div", { className: "marquee-content" }, config.tickerText))
-                ) : React.createElement("div", { className: "p-10" },
-                    React.createElement("h1", { className: "text-4xl font-black mb-10" }, "Staff Console"),
-                    queue.filter(p => p.status !== 'completed').map(p => 
-                        React.createElement("div", { key: p.id, className: "p-6 bg-white border rounded-3xl flex justify-between items-center mb-4 shadow-sm" },
-                            React.createElement("span", { className: "text-2xl font-black mono-num" }, p.num),
-                            React.createElement("button", { 
-                                onClick: () => db.collection("queue").doc(p.id).update({ status: p.status === 'calling' ? 'completed' : 'calling', callTrigger: Date.now(), loc: 'Room 1' }),
-                                className: "px-8 py-3 bg-blue-600 text-white rounded-xl font-bold"
-                            }, p.status === 'calling' ? 'DONE' : 'CALL')
-                        )
-                    )
-                ),
-                React.createElement("div", { className: "glass-nav" },
-                    React.createElement("button", { onClick: () => setView('tv'), className: `font-black text-[10px] ${view === 'tv' ? 'text-blue-400' : 'text-white/40'}` }, "TV VIEW"),
-                    React.createElement("button", { onClick: () => setView('admin'), className: `font-black text-[10px] ${view === 'admin' ? 'text-blue-400' : 'text-white/40'}` }, "ADMIN")
-                )
+            // --- VIEW RENDERING ---
+            return (
+                <div className="h-screen w-screen relative">
+                    {view === 'tv' ? (
+                        <div className="h-full tv-screen flex flex-col">
+                            {!audioUnlocked && (
+                                <div className="absolute inset-0 z-50 bg-black/90 flex items-center justify-center">
+                                    <button onClick={() => {setAudioUnlocked(true); chime.play();}} className="bg-blue-600 text-white px-10 py-5 rounded-full font-black text-xl animate-bounce">START SYSTEM</button>
+                                </div>
+                            )}
+                            <div className="flex justify-between items-center px-12 py-8 cyber-panel rounded-none">
+                                <h1 className="text-3xl font-black">{config.header}</h1>
+                                <div className="text-4xl font-black mono-num">{new Date().toLocaleTimeString()}</div>
+                            </div>
+                            <div className="flex-1 flex flex-col items-center justify-center">
+                                {currentCaller ? (
+                                    <div>
+                                        <p className="text-blue-400 font-black tracking-widest uppercase mb-4">{lang === 'en' ? 'Now Calling' : 'Sedang Dipanggil'}</p>
+                                        <h1 className="text-[12rem] font-black hero-glow mono-num leading-none">{currentCaller.num}</h1>
+                                        <div className="bg-white text-black px-12 py-4 rounded-2xl text-5xl font-black mt-10 inline-block">{currentCaller.loc}</div>
+                                    </div>
+                                ) : (
+                                    <p className="text-4xl font-black opacity-10 uppercase tracking-widest">Standing By</p>
+                                )}
+                            </div>
+                            <div className="ticker-bar"><div className="marquee-content">{config.tickerText}</div></div>
+                        </div>
+                    ) : (
+                        <div className="p-10 text-slate-900">
+                            <div className="flex justify-between items-center mb-10">
+                                <h1 className="text-4xl font-black">Staff Console</h1>
+                                <button onClick={() => setLang(lang === 'en' ? 'ms' : 'en')} className="bg-white border-2 px-6 py-2 rounded-xl font-bold text-blue-600">{lang === 'en' ? 'BM' : 'EN'}</button>
+                            </div>
+                            {queue.filter(p => p.status !== 'completed').map(p => (
+                                <div key={p.id} className="p-6 bg-white border rounded-3xl flex justify-between items-center mb-4">
+                                    <span className="text-3xl font-black mono-num">{p.num}</span>
+                                    <button 
+                                        onClick={() => db.collection("queue").doc(p.id).update({ status: p.status === 'calling' ? 'completed' : 'calling', callTrigger: Date.now(), loc: 'Room 1' })}
+                                        className="px-10 py-3 bg-blue-600 text-white rounded-xl font-bold"
+                                    >
+                                        {p.status === 'calling' ? 'FINISH' : 'CALL'}
+                                    </button>
+                                </div>
+                            ))}
+                            <button onClick={() => setShowSettings(true)} className="mt-10 text-slate-400 font-bold uppercase tracking-widest text-xs"><i className="ri-settings-4-fill mr-2"></i> Open Settings</button>
+                        </div>
+                    )}
+
+                    <div className="glass-nav">
+                        <button onClick={() => setView('tv')} className={`font-black text-[10px] tracking-widest ${view === 'tv' ? 'text-blue-400' : 'text-white/40'}`}>TV VIEW</button>
+                        <button onClick={() => setView('admin')} className={`font-black text-[10px] tracking-widest ${view === 'admin' ? 'text-blue-400' : 'text-white/40'}`}>ADMIN</button>
+                    </div>
+
+                    {showSettings && (
+                        <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-6">
+                            <div className="bg-white rounded-[3rem] p-12 w-full max-w-xl text-slate-800">
+                                <h2 className="text-3xl font-black mb-8">Voice Config</h2>
+                                <div className="space-y-6">
+                                    <input value={config.templateEn} onChange={e => setConfig({...config, templateEn: e.target.value})} className="w-full p-4 bg-slate-50 border rounded-xl" placeholder="English Template" />
+                                    <input value={config.templateMs} onChange={e => setConfig({...config, templateMs: e.target.value})} className="w-full p-4 bg-slate-50 border rounded-xl" placeholder="Malay Template" />
+                                    <button onClick={async () => { await db.collection("settings").doc("config").set(config); setShowSettings(false); }} className="w-full bg-blue-600 text-white p-5 rounded-2xl font-black">SAVE CHANGES</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
             );
         };
-        ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+
+        // Initialize the app
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(React.createElement(App));
     </script>
 </body>
 </html>
