@@ -15,17 +15,25 @@
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
 
     <style>
-        :root { --accent: #3b82f6; --surface: #ffffff; --bg: #f8fafc; }
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: #0f172a; height: 100vh; overflow: hidden; }
-        .bento-card { background: var(--surface); border-radius: 2.5rem; box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.05); border: 1px solid rgba(226, 232, 240, 0.8); }
-        .tv-screen { background: radial-gradient(circle at top right, #1e293b, #020617); color: #f8fafc; }
-        .cyber-panel { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); border-radius: 2rem; }
-        .ticker-bar { background: linear-gradient(90deg, #1e40af, #3b82f6); height: 60px; display: flex; align-items: center; }
-        .marquee-content { white-space: nowrap; display: inline-block; animation: marquee 30s linear infinite; font-weight: 800; font-size: 1.25rem; }
+        :root { --accent: #3b82f6; --surface: #0047AB; --bg: #00CED1; } /* Matching the blue/cyan theme */
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: #000; height: 100vh; overflow: hidden; margin: 0; }
+        
+        /* Layout Containers */
+        .tv-container { display: grid; grid-template-rows: 120px 1fr 80px; height: 100vh; padding: 20px; box-sizing: border-box; gap: 20px; }
+        .main-content { display: grid; grid-template-columns: 350px 1fr; gap: 20px; }
+        
+        /* Component Styles */
+        .box-blue { background: var(--surface); color: white; border-radius: 4px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .box-gray { background: #B4B4B4; border-radius: 4px; padding: 15px; }
+        
+        .ticker-bar { background: var(--bg); border-top: 2px solid rgba(0,0,0,0.1); display: flex; align-items: center; overflow: hidden; }
+        .marquee-content { white-space: nowrap; animation: marquee 25s linear infinite; font-weight: 800; font-size: 2rem; color: #000; }
         @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
-        .mono-num { font-family: 'JetBrains Mono', monospace; }
-        .glass-nav { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
-        .slideshow-img { width: 100%; height: 100%; object-fit: cover; border-radius: 1.5rem; transition: opacity 1s ease-in-out; }
+
+        .mono-num { font-family: 'JetBrains Mono', monospace; font-weight: 800; }
+        .slideshow-img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
+        
+        .glass-nav { background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
     </style>
 </head>
 <body>
@@ -46,8 +54,8 @@
         const db = firebase.firestore();
 
         const i18n = {
-            en: { pharmacy: "Pharmacy Collection", ready: "READY", nowCalling: "Now Calling", standingBy: "STANDING BY", healthTips: "Clinic Notices", load: "Queue Load", waiting: "Patients Waiting", doctorDash: "DOCTOR DASHBOARD", call: "Call", finish: "Finish", dispense: "Dispense", recall: "Recall", getTicket: "Get Ticket", totalToday: "Total Today", waitingLabel: "Waiting", namePlaceholder: "Patient Name (Optional)", useSuggestion: "Use", localTime: "Local Time", testVoice: "Test Voice", systemSettings: "System Settings", interfaceLang: "Secondary Language Mode", langDesc: "Turn on Mandarin to show dual-language text and enable bilingual voice announcements." },
-            zh: { pharmacy: "药剂处领药", ready: "就绪", nowCalling: "正在传召", standingBy: "准备就绪", healthTips: "诊所通告", load: "候诊人数", waiting: "人正在等待", doctorDash: "医生控制台", call: "呼叫", finish: "完成", dispense: "发药", recall: "重召", getTicket: "取票", totalToday: "今日总数", waitingLabel: "等待中", namePlaceholder: "患者姓名 (选填)", useSuggestion: "使用", localTime: "当地时间", testVoice: "测试语音", systemSettings: "系统设置", interfaceLang: "第二语言模式", langDesc: "开启中文将显示双语文字并启用双语语音播报。" }
+            en: { calling: "CALLING", location: "LOCATION", number: "NUMBER", localTime: "CLOCK", nowCalling: "NOW CALLING", standingBy: "READY" },
+            zh: { calling: "正在呼叫", location: "诊室", number: "号码", localTime: "时间", nowCalling: "正在传召", standingBy: "准备就绪" }
         };
 
         const App = () => {
@@ -55,65 +63,40 @@
             const [queue, setQueue] = React.useState([]);
             const [slides, setSlides] = React.useState([]);
             const [slideIndex, setSlideIndex] = React.useState(0);
-            const [config, setConfig] = React.useState({
-                rooms: ['Room 1', 'Room 2', 'Room 3'],
-                header: 'QueEasy Clinic',
-                tickerText: 'Welcome to QueEasy.',
-                showTicker: true,
-                lang: 'en' // 'en' = English Only, 'zh' = English + Mandarin
-            });
+            const [config, setConfig] = React.useState({ header: 'QUE EASY', tickerText: 'SCROLLING TICKER GOES HERE', rooms: ['Room 1'], lang: 'en' });
             const [showSettings, setShowSettings] = React.useState(false);
-            const [inputNum, setInputNum] = React.useState('');
-            const [inputName, setInputName] = React.useState('');
-            const [myRoom, setMyRoom] = React.useState('Room 1');
             const [audioUnlocked, setAudioUnlocked] = React.useState(false);
+            const [myRoom, setMyRoom] = React.useState('Room 1');
 
-            // Helper for Dual Text Rendering
             const T = ({ k, className = "" }) => (
                 <div className={`flex flex-col leading-tight ${className}`}>
                     <span>{i18n.en[k]}</span>
-                    {config.lang === 'zh' && <span className="text-[0.6em] opacity-80 font-normal tracking-normal">{i18n.zh[k]}</span>}
+                    {config.lang === 'zh' && <span className="text-[0.6em] opacity-80 font-normal">{i18n.zh[k]}</span>}
                 </div>
             );
 
             React.useEffect(() => {
                 const unsubQ = db.collection("queue").orderBy("time", "desc").onSnapshot(s => setQueue(s.docs.map(d => ({id:d.id, ...d.data()}))));
                 const unsubC = db.collection("settings").doc("config").onSnapshot(doc => doc.exists && setConfig(prev => ({...prev, ...doc.data()})));
-                window.speechSynthesis.getVoices();
-                return () => { unsubQ(); unsubC(); };
-            }, []);
-
-            // === VOICE ENGINE ===
-            const getVoice = (langCode) => {
-                const vs = window.speechSynthesis.getVoices();
-                if (langCode === 'zh') return vs.find(v => v.lang.includes('zh') || v.lang.includes('CN') || v.name.includes('Chinese'));
-                return vs.find(v => v.lang.startsWith('en-GB')) || vs.find(v => v.lang.startsWith('en'));
-            };
+                if (slides.length > 0) {
+                    const timer = setInterval(() => setSlideIndex(prev => (prev + 1) % slides.length), 5000);
+                    return () => clearInterval(timer);
+                }
+                return () => unsubQ();
+            }, [slides.length]);
 
             const speakDual = (num, loc) => {
                 window.speechSynthesis.cancel();
-
-                // 1. Always Speak English
-                const enText = `Number ${num}. Please proceed to ${loc}.`;
-                const uEn = new SpeechSynthesisUtterance(enText);
-                const vEn = getVoice('en');
-                if(vEn) uEn.voice = vEn;
-                uEn.rate = 0.9; 
+                const uEn = new SpeechSynthesisUtterance(`Number ${num}. Please proceed to ${loc}.`);
+                uEn.rate = 0.9;
                 window.speechSynthesis.speak(uEn);
 
-                // 2. Speak Mandarin only if config.lang is 'zh'
                 if (config.lang === 'zh') {
                     const roomNum = loc.replace(/[^0-9]/g, ''); 
-                    const zhTextCharacters = `请 ${num} 号, 到 ${roomNum} 号房`;
-                    const uZh = new SpeechSynthesisUtterance(zhTextCharacters);
-                    const vZh = getVoice('zh');
-                    
-                    if (vZh) {
-                        uZh.voice = vZh;
-                        uZh.lang = vZh.lang;
-                        uZh.rate = 0.9;
-                        window.speechSynthesis.speak(uZh);
-                    }
+                    const uZh = new SpeechSynthesisUtterance(`请 ${num} 号, 到 ${roomNum} 号房`);
+                    const vs = window.speechSynthesis.getVoices();
+                    const vZh = vs.find(v => v.lang.includes('zh') || v.name.includes('Chinese'));
+                    if (vZh) { uZh.voice = vZh; uZh.rate = 0.9; window.speechSynthesis.speak(uZh); }
                 }
             };
 
@@ -123,155 +106,127 @@
             React.useEffect(() => {
                 if(view === 'tv' && currentCaller && audioUnlocked && currentCaller.callTrigger > lastCallRef.current) {
                     lastCallRef.current = currentCaller.callTrigger;
-                    const chime = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-                    chime.play().then(() => {
-                        setTimeout(() => {
-                            speakDual(currentCaller.num, currentCaller.loc);
-                        }, 1300);
-                    });
+                    new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play();
+                    setTimeout(() => speakDual(currentCaller.num, currentCaller.loc), 1300);
                 }
             }, [currentCaller, audioUnlocked, view]);
 
             return (
                 <div className="h-screen w-screen relative">
-                    {/* TV VIEW */}
                     {view === 'tv' ? (
-                        <div className="h-full tv-screen flex flex-col overflow-hidden">
-                            <div className="flex justify-between items-center px-10 py-6 cyber-panel rounded-none">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center text-2xl font-black">Q</div>
-                                    <h2 className="text-2xl font-black uppercase">{config.header}</h2>
-                                </div>
-                                <div className="flex gap-6 items-center">
-                                    <div className="text-right">
-                                        <p className="text-[10px] font-bold text-slate-500 uppercase"><T k="localTime" /></p>
-                                        <p className="text-3xl font-black mono-num">{new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
+                        <div className="tv-container">
+                            {/* HEADER */}
+                            <div className="flex justify-between items-start">
+                                <h1 className="text-6xl font-black italic tracking-tighter">{config.header}</h1>
+                                <div className="text-right">
+                                    <div className="text-4xl font-bold uppercase">
+                                        {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}
                                     </div>
-                                    <button onClick={() => setAudioUnlocked(!audioUnlocked)} className={`w-12 h-12 rounded-xl flex items-center justify-center ${audioUnlocked ? 'bg-blue-600/20 text-blue-400' : 'bg-red-600 text-white animate-pulse'}`}>
-                                        <i className={audioUnlocked ? "ri-volume-up-fill text-xl" : "ri-volume-mute-fill text-xl"}></i>
+                                    <div className="text-xl font-bold opacity-80 uppercase">
+                                        {new Date().toLocaleDateString([], {weekday: 'long', day: 'numeric', month: 'long'})}
+                                    </div>
+                                    <button onClick={() => setAudioUnlocked(!audioUnlocked)} className="text-xs font-black mt-2 underline">
+                                        {audioUnlocked ? "AUDIO ON" : "CLICK TO UNMUTE"}
                                     </button>
                                 </div>
                             </div>
-                            <div className="flex-1 flex p-6 gap-6 mb-12">
-                                <div className="w-1/4 cyber-panel p-6">
-                                    <h3 className="text-amber-500 font-black text-xs uppercase mb-4 tracking-widest"><T k="pharmacy" /></h3>
-                                    {queue.filter(p=>p.status==='collecting').slice(0,5).map(p=>(
-                                        <div key={p.id} className="flex justify-between items-center bg-white/5 p-4 rounded-xl mb-2 border border-white/5">
-                                            <span className="text-4xl font-black text-amber-500 mono-num">{p.num}</span>
-                                            <div className="text-right text-[10px] font-bold opacity-40 uppercase"><T k="ready" /></div>
+
+                            {/* MIDDLE SECTION */}
+                            <div className="main-content">
+                                <div className="flex flex-col gap-4">
+                                    {/* CALLING BOX */}
+                                    <div className="box-blue h-1/2 p-6 text-center">
+                                        <div className="text-3xl font-bold mb-2"><T k="calling" /></div>
+                                        <div className="text-[100px] leading-none mono-num mb-2">
+                                            {currentCaller ? currentCaller.num : "##"}
+                                        </div>
+                                        <div className="text-3xl font-bold uppercase">
+                                            {currentCaller ? currentCaller.loc : <T k="location" />}
+                                        </div>
+                                    </div>
+                                    
+                                    {/* HISTORY BOX */}
+                                    <div className="box-gray flex-1">
+                                        <div className="flex justify-between border-b-2 border-black/20 pb-2 mb-2 font-bold text-sm">
+                                            <T k="number" />
+                                            <T k="location" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            {queue.filter(p => p.status === 'collecting').slice(0, 5).map(p => (
+                                                <div key={p.id} className="flex justify-between text-2xl font-black italic">
+                                                    <span>{p.num}</span>
+                                                    <span>{p.loc}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* SLIDESHOW BOX */}
+                                <div className="box-blue relative overflow-hidden">
+                                    {slides.length > 0 ? (
+                                        <img src={slides[slideIndex]} className="slideshow-img" />
+                                    ) : (
+                                        <div className="text-4xl font-bold text-white/20">IMAGE SLIDESHOW GOES HERE</div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* FOOTER TICKER */}
+                            <div className="ticker-bar">
+                                <div className="marquee-content uppercase">{config.tickerText}</div>
+                            </div>
+                        </div>
+                    ) : (
+                        /* RETENTION OF PREVIOUS ADMIN/REGISTRATION VIEWS */
+                        <div className="p-10 bg-white h-full">
+                            <h2 className="text-2xl font-bold mb-4">{view === 'admin' ? "Doctor Dashboard" : "Kiosk"}</h2>
+                            {view === 'admin' && (
+                                <div className="grid grid-cols-4 gap-4">
+                                    {queue.filter(p=>p.status!=='finished').map(p=>(
+                                        <div key={p.id} className="p-4 border-2 rounded-xl text-center">
+                                            <p className="text-4xl font-bold">{p.num}</p>
+                                            <button onClick={()=>db.collection("queue").doc(p.id).update({status:'calling', loc:myRoom, callTrigger:Date.now()})} className="bg-blue-600 text-white w-full mt-2 py-2 rounded">Call</button>
                                         </div>
                                     ))}
                                 </div>
-                                <div className="flex-1 cyber-panel border border-blue-500/20 flex flex-col items-center justify-center text-center">
-                                    {currentCaller ? (
-                                        <div>
-                                            <div className="inline-block bg-blue-600/10 text-blue-400 border border-blue-500/30 px-8 py-3 rounded-2xl text-sm font-black uppercase mb-8"><T k="nowCalling" /></div>
-                                            <h1 className="text-[14rem] font-black leading-none mono-num mb-6 text-blue-500">{currentCaller.num}</h1>
-                                            <div className="inline-block bg-white text-slate-950 px-16 py-6 rounded-2xl text-6xl font-black uppercase">{currentCaller.loc}</div>
-                                        </div>
-                                    ) : <div className="opacity-10 text-4xl font-black uppercase text-center"><T k="standingBy" /></div>}
-                                </div>
-                                <div className="w-1/4 cyber-panel p-4 flex flex-col">
-                                    <h3 className="text-blue-400 font-black text-xs uppercase mb-4 tracking-widest"><T k="healthTips" /></h3>
-                                    <div className="flex-1 bg-black/40 rounded-2xl overflow-hidden">
-                                        {slides.length > 0 ? <img src={slides[slideIndex]} className="slideshow-img" /> : <div className="p-8 text-center text-xs opacity-30">Upload photos in settings</div>}
-                                    </div>
-                                    <div className="mt-4 p-4 bg-white/5 rounded-xl text-center">
-                                        <div className="text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-widest"><T k="load" /></div>
-                                        <p className="text-2xl font-black text-blue-400 mb-1">{queue.filter(p=>p.status==='waiting').length}</p>
-                                        <div className="text-[10px] opacity-60 uppercase"><T k="waiting" /></div>
-                                    </div>
-                                </div>
-                            </div>
-                            {config.showTicker && <div className="ticker-bar fixed bottom-0 w-full"><div className="marquee-content">{config.tickerText}</div></div>}
-                        </div>
-                    ) : (
-                        <div className="h-full bg-slate-50 p-8">
-                            {view === 'reg' && (
-                                <div className="max-w-md mx-auto bento-card p-12 text-center mt-10">
-                                    <h2 className="text-3xl font-black mb-8">{config.header}</h2>
-                                    <input type="number" className="w-full text-center text-8xl font-black mono-num outline-none bg-transparent mb-8" placeholder="0000" value={inputNum} onChange={e=>setInputNum(e.target.value)} />
-                                    <input className="w-full bg-slate-100 p-6 rounded-3xl text-xl font-bold mb-4 text-center" placeholder="Patient Name (Optional)" value={inputName} onChange={e=>setInputName(e.target.value)} />
-                                    <button onClick={async () => {
-                                        const n = inputNum || (queue.length ? Math.max(...queue.map(p=>parseInt(p.num)||0))+1 : 1001);
-                                        await db.collection("queue").add({num:n, name:inputName||'Patient', status:'waiting', time:Date.now(), loc:'-'});
-                                        setInputNum(''); setInputName('');
-                                    }} className="w-full bg-slate-900 text-white p-6 rounded-3xl font-black uppercase hover:scale-[1.02] transition-transform">
-                                        <T k="getTicket" className="text-2xl items-center" />
-                                    </button>
-                                </div>
                             )}
-                            {view === 'admin' && (
-                                <div className="h-full flex flex-col">
-                                    <div className="flex justify-between items-center mb-6">
-                                        <h2 className="text-xl font-black uppercase flex items-center gap-2"><T k="doctorDash" /></h2>
-                                        <select value={myRoom} onChange={e=>setMyRoom(e.target.value)} className="bg-white px-4 py-2 rounded-xl font-bold border-2 border-slate-200">
-                                            {config.rooms.map(r=><option key={r} value={r}>{r}</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="grid grid-cols-4 gap-6 overflow-y-auto pb-20">
-                                        {queue.filter(p=>p.status!=='finished').map(p=>(
-                                            <div key={p.id} className="bento-card p-6 text-center">
-                                                <p className="text-5xl font-black mono-num">{p.num}</p>
-                                                <p className="text-xs font-bold text-slate-400 mb-4">{p.name}</p>
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    <button onClick={()=>db.collection("queue").doc(p.id).update({status:'calling', loc:myRoom, callTrigger:Date.now()})} className="bg-blue-600 text-white py-3 rounded-xl font-black text-xs uppercase flex items-center justify-center text-center"><T k="call" /></button>
-                                                    <button onClick={()=>db.collection("queue").doc(p.id).update({status:'collecting', loc:'Pharmacy'})} className="bg-slate-900 text-white py-3 rounded-xl font-black text-xs uppercase flex items-center justify-center text-center"><T k="finish" /></button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
+                            {view === 'reg' && (
+                                <button onClick={()=>db.collection("queue").add({num: Math.floor(1000 + Math.random() * 9000), status:'waiting', time:Date.now(), loc:'-'})} className="bg-black text-white p-10 text-3xl font-bold rounded-3xl">GET TICKET</button>
                             )}
                         </div>
                     )}
 
-                    <div className="fixed bottom-8 left-1/2 -translate-x-1/2 glass-nav px-3 py-3 rounded-full flex gap-2 items-center z-[100] shadow-2xl">
-                        {[{id:'reg', icon:'ri-add-line', label:'Kiosk'},{id:'tv', icon:'ri-tv-line', label:'TV'},{id:'admin', icon:'ri-stethoscope-line', label:'Doctor'}].map(item => (
-                            <button key={item.id} onClick={() => setView(item.id)} className={`flex items-center gap-2 px-6 py-3 rounded-full transition-all ${view === item.id ? 'bg-blue-600 text-white shadow-xl' : 'text-slate-400'}`}>
-                                <i className={`${item.icon} text-lg`}></i>
-                                {view === item.id && <span className="text-[10px] font-black uppercase">{item.label}</span>}
-                            </button>
+                    {/* NAV BAR */}
+                    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 glass-nav px-6 py-3 rounded-full flex gap-4 items-center z-[100]">
+                        {['tv', 'reg', 'admin'].map(v => (
+                            <button key={v} onClick={() => setView(v)} className={`uppercase font-black text-xs ${view === v ? 'text-cyan-400' : 'text-white'}`}>{v}</button>
                         ))}
-                        <button onClick={() => setShowSettings(true)} className="p-3 text-slate-400 hover:text-white"><i className="ri-settings-4-line text-lg"></i></button>
+                        <button onClick={() => setShowSettings(true)} className="text-white"><i className="ri-settings-4-line"></i></button>
                     </div>
 
+                    {/* SETTINGS OVERLAY */}
                     {showSettings && (
-                        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[999] flex items-center justify-center p-6">
-                            <div className="bg-white w-full max-w-lg rounded-[3rem] p-10 space-y-8">
-                                <div className="flex justify-between items-center"><h2 className="text-2xl font-black uppercase"><T k="systemSettings" /></h2><button onClick={()=>setShowSettings(false)} className="bg-slate-100 p-4 rounded-full"><i className="ri-close-line text-2xl"></i></button></div>
-                                
-                                <div className="space-y-6">
-                                    <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase block mb-3"><T k="interfaceLang" /></label>
-                                        <div className="flex gap-2">
-                                            <button onClick={()=>db.collection("settings").doc("config").set({...config, lang:'en'}, {merge:true})} className={`flex-1 py-4 rounded-2xl font-black text-xs border-2 ${config.lang === 'en' ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-slate-100 text-slate-400'}`}>
-                                                OFF
-                                            </button>
-                                            <button onClick={()=>db.collection("settings").doc("config").set({...config, lang:'zh'}, {merge:true})} className={`flex-1 py-4 rounded-2xl font-black text-xs border-2 ${config.lang === 'zh' ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-slate-100 text-slate-400'}`}>
-                                                ON (中文)
-                                            </button>
-                                        </div>
-                                        <p className="text-[10px] text-slate-400 mt-3 italic leading-relaxed"><T k="langDesc" /></p>
-                                        <button onClick={() => speakDual("1001", "Room 2")} className="w-full mt-4 py-3 bg-blue-50 rounded-xl text-[10px] font-bold text-blue-500 uppercase flex justify-center items-center"><i className="ri-volume-up-line mr-2"></i> <T k="testVoice" /></button>
+                        <div className="fixed inset-0 bg-black/90 z-[999] flex items-center justify-center p-10">
+                            <div className="bg-white p-10 rounded-3xl w-full max-w-lg">
+                                <div className="flex justify-between mb-6"><h2 className="text-2xl font-bold">Settings</h2><button onClick={()=>setShowSettings(false)}>X</button></div>
+                                <div className="space-y-4">
+                                    <label className="block font-bold">Secondary Language</label>
+                                    <div className="flex gap-2">
+                                        <button onClick={()=>db.collection("settings").doc("config").update({lang:'en'})} className={`flex-1 p-2 border ${config.lang==='en'?'bg-blue-500 text-white':''}`}>OFF</button>
+                                        <button onClick={()=>db.collection("settings").doc("config").update({lang:'zh'})} className={`flex-1 p-2 border ${config.lang==='zh'?'bg-blue-500 text-white':''}`}>ON (CN)</button>
                                     </div>
-
-                                    <div className="border-t pt-6">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Upload Slideshow</label>
-                                        <input type="file" multiple accept="image/*" onChange={(e)=>{
-                                            const f = Array.from(e.target.files);
-                                            Promise.all(f.map(file => new Promise(res => {
-                                                const r = new FileReader();
-                                                r.onload = (ev) => res(ev.target.result);
-                                                r.readAsDataURL(file);
-                                            }))).then(setSlides);
-                                        }} className="w-full text-xs font-bold text-slate-400 file:bg-blue-50 file:text-blue-600 file:border-0 file:rounded-full file:px-4 file:py-2" />
-                                    </div>
-                                    <div className="border-t pt-6">
-                                         <label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Clinic Name & Rooms</label>
-                                         <input className="w-full bg-slate-100 p-4 rounded-xl font-bold mb-2" value={config.header} onChange={e => db.collection("settings").doc("config").update({header: e.target.value})} />
-                                         <input className="w-full bg-slate-100 p-4 rounded-xl font-bold" value={config.rooms.join(',')} onChange={e => db.collection("settings").doc("config").update({rooms: e.target.value.split(',')})} />
-                                    </div>
+                                    <label className="block font-bold">Ticker Text</label>
+                                    <input className="w-full border p-2" value={config.tickerText} onChange={e=>db.collection("settings").doc("config").update({tickerText: e.target.value})} />
+                                    <label className="block font-bold">Clinic Name</label>
+                                    <input className="w-full border p-2" value={config.header} onChange={e=>db.collection("settings").doc("config").update({header: e.target.value})} />
+                                    <label className="block font-bold">Slideshow Upload</label>
+                                    <input type="file" multiple onChange={(e)=>{
+                                        const f = Array.from(e.target.files);
+                                        Promise.all(f.map(file => new Promise(res => {
+                                            const r = new FileReader(); r.onload = (ev) => res(ev.target.result); r.readAsDataURL(file);
+                                        }))).then(setSlides);
+                                    }} />
                                 </div>
                             </div>
                         </div>
