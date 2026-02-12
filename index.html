@@ -9,7 +9,7 @@
     <link href="https://fonts.googleapis.com" rel="stylesheet">
     <script src="https://unpkg.com"></script>
     <script src="https://unpkg.com"></script>
-    <script src="https://unpkg.com"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://www.gstatic.com"></script>
     <script src="https://www.gstatic.com"></script>
     <link href="https://cdn.jsdelivr.net" rel="stylesheet">
@@ -22,66 +22,65 @@
         .cyber-panel { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); border-radius: 2rem; }
         .hero-glow { text-shadow: 0 0 30px rgba(59, 130, 246, 0.5); animation: pulse-glow 2s infinite alternate; }
         @keyframes pulse-glow { from { transform: scale(1); } to { transform: scale(1.02); } }
-        .ticker-bar { background: linear-gradient(90deg, #1e40af, #3b82f6); height: 60px; display: flex; align-items: center; position: fixed; bottom: 0; width: 100%; overflow: hidden; z-index: 10; }
+        .ticker-bar { background: linear-gradient(90deg, #1e40af, #3b82f6); height: 60px; display: flex; align-items: center; position: fixed; bottom: 60px; width: 100%; overflow: hidden; z-index: 10; }
         .marquee-content { white-space: nowrap; display: inline-block; animation: marquee 30s linear infinite; font-weight: 800; font-size: 1.25rem; color: white; }
         @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
         .mono-num { font-family: 'JetBrains Mono', monospace; }
-        .glass-nav { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
-        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .glass-nav { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); border-top: 1px solid rgba(255,255,255,0.1); position: fixed; bottom: 0; width: 100%; height: 60px; display: flex; justify-content: center; align-items: center; gap: 40px; z-index: 20; }
+        .nav-btn { color: rgba(255,255,255,0.5); font-weight: 800; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; }
+        .nav-btn.active { color: #3b82f6; }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
+        // Using React hooks directly from React object for stability
+        const { useState, useEffect, useRef, useMemo } = React;
+
         const FIREBASE_CONFIG = {
             apiKey: "AIzaSyDZ6K02v3Ovwo7xLqL4x33sIQNzv3ydXL8",
             authDomain: "queueasy-ea33b.firebaseapp.com",
             projectId: "queueasy-ea33b",
             storageBucket: "queueasy-ea33b.firebasestorage.app",
             messagingSenderId: "507246685294",
-            appId: "1:507246685294:web:958210e662e481e021ca7f",
-            measurementId: "G-5CEFPED49P"
+            appId: "1:507246685294:web:958210e662e481e021ca7f"
         };
 
         if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
         const db = firebase.firestore();
 
         const App = () => {
-            const [view, setView] = React.useState('tv');
-            const [lang, setLang] = React.useState('en');
-            const [queue, setQueue] = React.useState([]);
-            const [config, setConfig] = React.useState({
+            const [view, setView] = useState('tv');
+            const [lang, setLang] = useState('en');
+            const [queue, setQueue] = useState([]);
+            const [config, setConfig] = useState({
                 rooms: ['Room 1', 'Room 2', 'Room 3'],
                 header: 'QueEasy Clinic',
                 tickerText: 'Welcome to QueEasy. Your health is our priority.',
-                showTicker: true,
                 mediaUrl: 'https://www.youtube.com',
-                mediaType: 'youtube',
                 templateEn: "Number {number}, please proceed to {room}",
                 templateMs: "Nombor {number}, sila ke {room}"
             });
-            const [showSettings, setShowSettings] = React.useState(false);
-            const [inputNum, setInputNum] = React.useState('');
-            const [inputName, setInputName] = React.useState('');
-            const [myRoom, setMyRoom] = React.useState('Room 1');
-            const [audioUnlocked, setAudioUnlocked] = React.useState(false);
+            const [showSettings, setShowSettings] = useState(false);
+            const [inputNum, setInputNum] = useState('');
+            const [myRoom, setMyRoom] = useState('Room 1');
+            const [audioUnlocked, setAudioUnlocked] = useState(false);
 
-            const lastCallRef = React.useRef(0);
+            const lastCallRef = useRef(0);
             const chime = new Audio('https://assets.mixkit.co');
 
-            React.useEffect(() => {
-                const unsubQ = db.collection("queue").orderBy("time", "desc").limit(100)
+            useEffect(() => {
+                const unsubQ = db.collection("queue").orderBy("time", "desc").limit(20)
                     .onSnapshot(snap => setQueue(snap.docs.map(d => ({id: d.id, ...d.data()}))));
                 const unsubC = db.collection("settings").doc("config")
                     .onSnapshot(doc => doc.exists && setConfig(prev => ({...prev, ...doc.data()})));
                 return () => { unsubQ(); unsubC(); };
             }, []);
 
-            // --- BILINGUAL VOICE LOGIC ---
             const playVoice = (num, room) => {
                 if(!audioUnlocked) return;
-                const parse = (t, n, r) => t.replace('{number}', n).replace('{room}', r.replace('Room', ''));
+                const parse = (t, n, r) => t.replace('{number}', n).replace('{room}', r.replace('Room ', '').replace('Bilik ', ''));
                 
                 chime.play().then(() => {
                     setTimeout(() => {
@@ -99,8 +98,9 @@
                 });
             };
 
-            const currentCaller = queue.find(p => p.status === 'calling');
-            React.useEffect(() => {
+            const currentCaller = useMemo(() => queue.find(p => p.status === 'calling'), [queue]);
+
+            useEffect(() => {
                 if(view === 'tv' && currentCaller && currentCaller.callTrigger > lastCallRef.current) {
                     lastCallRef.current = currentCaller.callTrigger;
                     playVoice(currentCaller.num, currentCaller.loc);
@@ -110,8 +110,8 @@
             const issueTicket = async () => {
                 const suggested = queue.length ? Math.max(...queue.map(p => parseInt(p.num) || 1000)) + 1 : 1001;
                 const num = inputNum || suggested.toString();
-                await db.collection("queue").add({ num, name: inputName || 'Patient', status: 'waiting', time: Date.now(), loc: '-' });
-                setInputNum(''); setInputName('');
+                await db.collection("queue").add({ num, status: 'waiting', time: Date.now(), loc: '-' });
+                setInputNum('');
             };
 
             const handleAction = async (id, status, loc) => {
@@ -120,107 +120,113 @@
                 await db.collection("queue").doc(id).update(p);
             };
 
-            // --- RENDER TV VIEW ---
-            const renderTv = () => React.createElement("div", { className: "h-full tv-screen flex flex-col relative overflow-hidden" },
-                !audioUnlocked && React.createElement("div", { className: "absolute inset-0 z-50 bg-black/95 flex items-center justify-center" },
-                    React.createElement("button", { onClick: () => {setAudioUnlocked(true); chime.play();}, className: "bg-blue-600 text-white px-12 py-6 rounded-full font-black text-2xl animate-bounce" }, "ACTIVATE AUDIO")
-                ),
-                React.createElement("div", { className: "flex justify-between items-center px-10 py-6 cyber-panel border-b border-white/10 rounded-none" },
-                    React.createElement("div", { className: "flex items-center gap-4" },
-                        React.createElement("div", { className: "w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center text-2xl font-black italic" }, "Q"),
-                        React.createElement("h2", { className: "text-2xl font-black tracking-tighter uppercase" }, config.header)
-                    ),
-                    React.createElement("div", { className: "text-right" },
-                        React.createElement("p", { className: "text-3xl font-black mono-num" }, new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}))
-                    )
-                ),
-                React.createElement("div", { className: "flex-1 flex p-6 gap-6 mb-[60px]" },
-                    React.createElement("div", { className: "flex-1 cyber-panel border border-blue-500/20 flex flex-col items-center justify-center text-center" },
-                        currentCaller ? React.createElement("div", null,
-                            React.createElement("div", { className: "bg-blue-600/10 text-blue-400 border border-blue-500/30 px-6 py-2 rounded-full text-sm font-black uppercase tracking-[0.5em] mb-8 animate-pulse" }, "Now Calling"),
-                            React.createElement("h1", { className: "text-[15rem] font-black leading-none hero-glow mono-num mb-8" }, currentCaller.num),
-                            React.createElement("div", { className: "inline-block bg-white text-slate-950 px-16 py-6 rounded-2xl text-6xl font-black uppercase" }, currentCaller.loc)
-                        ) : React.createElement("div", { className: "opacity-10 text-center" }, 
-                            React.createElement("i", { className: "ri-stethoscope-line text-[12rem]" }),
-                            React.createElement("p", { className: "text-4xl font-black" }, "STANDING BY")
-                        )
-                    ),
-                    React.createElement("div", { className: "w-1/4 cyber-panel p-4 flex flex-col" },
-                        React.createElement("h3", { className: "text-blue-400 font-black text-xs uppercase tracking-[0.2em] mb-4" }, "Media Feed"),
-                        React.createElement("div", { className: "flex-1 bg-black/40 rounded-2xl overflow-hidden" },
-                            React.createElement("iframe", { className: "w-full h-full", src: config.mediaUrl, frameBorder: "0", allow: "autoplay" })
-                        ),
-                        React.createElement("div", { className: "mt-4 space-y-3" },
-                            queue.filter(p => p.status === 'completed').slice(0, 3).map(p => 
-                                React.createElement("div", { key: p.id, className: "flex justify-between items-center bg-white/5 p-4 rounded-xl border border-white/5" },
-                                    React.createElement("span", { className: "text-2xl font-black mono-num" }, p.num),
-                                    React.createElement("span", { className: "text-[10px] font-black opacity-40 uppercase" }, p.loc)
-                                )
-                            )
-                        )
-                    )
-                ),
-                config.showTicker && React.createElement("div", { className: "ticker-bar" },
-                    React.createElement("div", { className: "marquee-content" }, `${config.tickerText} • ${config.tickerText}`)
-                )
-            );
+            // Using React.createElement pattern for max compatibility
+            return (
+                <div className="h-screen w-screen flex flex-col relative overflow-hidden">
+                    {view === 'tv' ? (
+                        <div className="h-full tv-screen flex flex-col relative">
+                            {!audioUnlocked && (
+                                <div className="absolute inset-0 z-50 bg-black/95 flex items-center justify-center">
+                                    <button onClick={() => {setAudioUnlocked(true); chime.play();}} className="bg-blue-600 text-white px-12 py-6 rounded-full font-black text-2xl shadow-2xl">ACTIVATE AUDIO / AKTIFKAN AUDIO</button>
+                                </div>
+                            )}
+                            <div className="flex justify-between items-center px-12 py-8 cyber-panel rounded-none border-b border-white/10">
+                                <div className="flex items-center gap-6">
+                                    <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-3xl font-black italic shadow-lg shadow-blue-500/20">Q</div>
+                                    <h1 className="text-3xl font-black uppercase tracking-tighter">{config.header}</h1>
+                                </div>
+                                <div className="text-4xl font-black mono-num">{new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                            </div>
 
-            // --- RENDER ADMIN VIEW ---
-            const renderAdmin = () => React.createElement("div", { className: "h-full flex flex-col bg-slate-50 p-8 overflow-y-auto" },
-                React.createElement("div", { className: "flex justify-between items-center mb-8" },
-                    React.createElement("h1", { className: "text-4xl font-black" }, lang === 'en' ? 'Staff Console' : 'Konsol Staf'),
-                    React.createElement("div", { className: "flex gap-3" },
-                        React.createElement("button", { onClick: () => setLang(lang === 'en' ? 'ms' : 'en'), className: "bg-white px-6 py-3 rounded-2xl font-black border shadow-sm" }, lang === 'en' ? 'BM' : 'EN'),
-                        React.createElement("select", { value: myRoom, onChange: e => setMyRoom(e.target.value), className: "bg-white px-6 py-3 rounded-2xl font-black border outline-none" },
-                            config.rooms.map(r => React.createElement("option", { key: r, value: r }, r))
-                        )
-                    )
-                ),
-                React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-3 gap-8" },
-                    React.createElement("div", { className: "bento-card p-8 space-y-4" },
-                        React.createElement("h2", { className: "text-xl font-black" }, "Issue Ticket"),
-                        React.createElement("input", { value: inputNum, onChange: e => setInputNum(e.target.value), placeholder: "Ticket #", className: "w-full p-4 bg-slate-100 rounded-xl font-bold" }),
-                        React.createElement("button", { onClick: issueTicket, className: "w-full bg-blue-600 text-white p-5 rounded-2xl font-black text-xl shadow-lg" }, "PRINT")
-                    ),
-                    React.createElement("div", { className: "md:col-span-2 bento-card p-6 space-y-4" },
-                        queue.filter(p => p.status !== 'completed').map(p => 
-                            React.createElement("div", { key: p.id, className: `p-6 rounded-3xl border-2 flex items-center justify-between ${p.status === 'calling' ? 'border-blue-500 bg-blue-50' : 'border-slate-100'}` },
-                                React.createElement("div", null,
-                                    React.createElement("p", { className: "text-3xl font-black mono-num" }, p.num),
-                                    React.createElement("p", { className: "text-xs font-bold text-slate-400" }, p.name)
-                                ),
-                                React.createElement("div", { className: "flex gap-2" },
-                                    p.status === 'waiting' ? 
-                                        React.createElement("button", { onClick: () => handleAction(p.id, 'calling', myRoom), className: "px-8 py-3 bg-blue-600 text-white rounded-xl font-black" }, "CALL") :
-                                        React.createElement("button", { onClick: () => handleAction(p.id, 'completed', p.loc), className: "px-8 py-3 bg-emerald-500 text-white rounded-xl font-black" }, "FINISH")
-                                )
-                            )
-                        )
-                    )
-                )
-            );
+                            <div className="flex-1 grid grid-cols-12 gap-8 p-8 pb-32">
+                                <div className="col-span-8 bento-card bg-black border-none overflow-hidden shadow-2xl">
+                                    <iframe className="w-full h-full" src={config.mediaUrl} frameBorder="0" allow="autoplay"></iframe>
+                                </div>
+                                <div className="col-span-4 flex flex-col gap-6">
+                                    <div className="cyber-panel p-8 flex-1 border border-white/10 text-center">
+                                        <p className="text-blue-400 font-black text-sm tracking-[0.3em] mb-4 uppercase">{lang === 'en' ? 'NOW CALLING' : 'SEDANG DIPANGGIL'}</p>
+                                        <div className="hero-glow text-[100px] leading-none font-black mono-num text-white">{currentCaller?.num || '---'}</div>
+                                        <div className="mt-6 px-8 py-3 bg-blue-600 rounded-full font-black text-xl uppercase tracking-widest">{currentCaller?.loc || '...'}</div>
+                                        
+                                        <div className="mt-12 space-y-4 text-left">
+                                            <h3 className="text-slate-500 font-black text-xs uppercase tracking-widest">{lang === 'en' ? 'HISTORY' : 'REKOD'}</h3>
+                                            {queue.filter(p => p.status === 'completed').slice(0, 3).map(p => (
+                                                <div key={p.id} className="flex justify-between items-center p-4 bg-white/5 rounded-2xl border border-white/5">
+                                                    <span className="text-2xl font-black mono-num">{p.num}</span>
+                                                    <span className="text-xs font-bold opacity-50 uppercase tracking-widest">{p.loc}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {config.tickerText && <div className="ticker-bar"><div className="marquee-content uppercase">{config.tickerText} • {config.tickerText}</div></div>}
+                        </div>
+                    ) : (
+                        <div className="h-full max-w-6xl mx-auto p-8 space-y-8 overflow-y-auto pb-24 text-slate-800">
+                            <div className="flex justify-between items-center">
+                                <h1 className="text-5xl font-black tracking-tight">{lang === 'en' ? 'Staff Portal' : 'Portal Staf'}</h1>
+                                <div className="flex gap-4">
+                                    <button onClick={() => setLang(lang === 'en' ? 'ms' : 'en')} className="px-6 py-3 bg-white border-2 rounded-2xl font-black text-blue-600 shadow-sm">{lang === 'en' ? 'BM' : 'EN'}</button>
+                                    <button onClick={() => setShowSettings(true)} className="p-4 bg-slate-900 text-white rounded-2xl shadow-xl"><i className="ri-settings-5-fill text-xl"></i></button>
+                                </div>
+                            </div>
 
-            return React.createElement("div", { className: "h-screen w-screen relative" },
-                view === 'tv' ? renderTv() : renderAdmin(),
-                React.createElement("div", { className: "fixed bottom-8 left-1/2 -translate-x-1/2 glass-nav px-3 py-3 rounded-full flex gap-2 items-center z-[100] shadow-2xl" },
-                    React.createElement("button", { onClick: () => setView('tv'), className: `px-8 py-3 rounded-full font-black text-[10px] uppercase tracking-widest ${view === 'tv' ? 'bg-blue-600 text-white' : 'text-slate-400'}` }, "TV"),
-                    React.createElement("button", { onClick: () => setView('admin'), className: `px-8 py-3 rounded-full font-black text-[10px] uppercase tracking-widest ${view === 'admin' ? 'bg-blue-600 text-white' : 'text-slate-400'}` }, "STAFF"),
-                    React.createElement("button", { onClick: () => setShowSettings(true), className: "p-3 text-slate-400" }, React.createElement("i", { className: "ri-settings-4-line text-lg" }))
-                ),
-                showSettings && React.createElement("div", { className: "fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[999] flex items-center justify-center p-6" },
-                    React.createElement("div", { className: "bg-white w-full max-w-xl rounded-[3rem] p-10 space-y-6" },
-                        React.createElement("h2", { className: "text-2xl font-black" }, "System Settings"),
-                        React.createElement("div", null,
-                            React.createElement("label", { className: "text-[10px] font-black text-slate-400 uppercase" }, "English Template"),
-                            React.createElement("input", { value: config.templateEn, onChange: e => setConfig({...config, templateEn: e.target.value}), className: "w-full p-4 bg-slate-100 rounded-xl mt-1" })
-                        ),
-                        React.createElement("div", null,
-                            React.createElement("label", { className: "text-[10px] font-black text-slate-400 uppercase" }, "Malay Template"),
-                            React.createElement("input", { value: config.templateMs, onChange: e => setConfig({...config, templateMs: e.target.value}), className: "w-full p-4 bg-slate-100 rounded-xl mt-1" })
-                        ),
-                        React.createElement("button", { onClick: async () => { await db.collection("settings").doc("config").set(config); setShowSettings(false); }, className: "w-full bg-blue-600 text-white p-5 rounded-2xl font-black" }, "SAVE CONFIG")
-                    )
-                )
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                <div className="bento-card p-10 space-y-6">
+                                    <h2 className="text-2xl font-black">{lang === 'en' ? 'Issue Ticket' : 'Tiket Baru'}</h2>
+                                    <input value={inputNum} onChange={e => setInputNum(e.target.value)} placeholder="No" className="w-full p-4 bg-slate-100 rounded-xl" />
+                                    <button onClick={issueTicket} className="w-full bg-blue-600 text-white p-5 rounded-2xl font-black">PRINT</button>
+                                </div>
+
+                                <div className="md:col-span-2 bento-card p-6">
+                                    <div className="flex justify-between mb-4 p-4">
+                                        <h2 className="font-black text-slate-400 text-sm tracking-widest uppercase">LIVE LIST</h2>
+                                        <select value={myRoom} onChange={e => setMyRoom(e.target.value)} className="bg-slate-100 p-2 rounded-lg font-bold">
+                                            {config.rooms.map(r => <option key={r} value={r}>{r}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="space-y-4">
+                                        {queue.filter(p => p.status !== 'completed').map(p => (
+                                            <div key={p.id} className={`p-6 rounded-3xl border-2 flex items-center justify-between ${p.status === 'calling' ? 'border-blue-500 bg-blue-50' : 'border-slate-100 bg-white'}`}>
+                                                <span className="text-3xl font-black mono-num">{p.num}</span>
+                                                <div className="flex gap-3">
+                                                    {p.status === 'waiting' ? (
+                                                        <button onClick={() => handleAction(p.id, 'calling', myRoom)} className="px-8 py-3 bg-blue-600 text-white rounded-xl font-bold">CALL</button>
+                                                    ) : (
+                                                        <button onClick={() => handleAction(p.id, 'completed', p.loc)} className="px-8 py-3 bg-emerald-500 text-white rounded-xl font-black">DONE</button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="glass-nav">
+                        <button onClick={() => setView('tv')} className={`nav-btn ${view === 'tv' ? 'active' : ''}`}>TV VIEW</button>
+                        <button onClick={() => setView('admin')} className={`nav-btn ${view === 'admin' ? 'active' : ''}`}>ADMIN</button>
+                    </div>
+
+                    {showSettings && (
+                        <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-6">
+                            <div className="bg-white rounded-[3rem] p-12 w-full max-w-xl space-y-6 text-slate-800">
+                                <h2 className="text-3xl font-black">Voice Settings</h2>
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase">English Announcement</label>
+                                    <input value={config.templateEn} onChange={e => setConfig({...config, templateEn: e.target.value})} className="w-full p-4 bg-slate-50 rounded-xl mt-1 border" />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase">Malay Announcement (BM)</label>
+                                    <input value={config.templateMs} onChange={e => setConfig({...config, templateMs: e.target.value})} className="w-full p-4 bg-slate-50 rounded-xl mt-1 border" />
+                                </div>
+                                <button onClick={async () => { await db.collection("settings").doc("config").set(config); setShowSettings(false); }} className="w-full bg-blue-600 text-white p-5 rounded-2xl font-black">SAVE CHANGES</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
             );
         };
 
