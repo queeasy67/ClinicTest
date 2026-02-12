@@ -46,8 +46,8 @@
         const db = firebase.firestore();
 
         const i18n = {
-            en: { pharmacy: "Pharmacy Collection", ready: "READY", nowCalling: "Now Calling", standingBy: "STANDING BY", healthTips: "Clinic Notices", load: "Queue Load", waiting: "Patients Waiting", doctorDash: "DOCTOR DASHBOARD", call: "Call", finish: "Finish", dispense: "Dispense", recall: "Recall", getTicket: "Get Ticket", totalToday: "Total Today", waitingLabel: "Waiting", namePlaceholder: "Patient Name (Optional)", useSuggestion: "Use", localTime: "Local Time", testVoice: "Test Voice" },
-            zh: { pharmacy: "药剂处领药", ready: "就绪", nowCalling: "正在传召", standingBy: "准备就绪", healthTips: "诊所通告", load: "候诊人数", waiting: "人正在等待", doctorDash: "医生控制台", call: "呼叫", finish: "完成", dispense: "发药", recall: "重召", getTicket: "取票", totalToday: "今日总数", waitingLabel: "等待中", namePlaceholder: "患者姓名 (选填)", useSuggestion: "使用", localTime: "当地时间", testVoice: "测试语音" }
+            en: { pharmacy: "Pharmacy Collection", ready: "READY", nowCalling: "Now Calling", standingBy: "STANDING BY", healthTips: "Clinic Notices", load: "Queue Load", waiting: "Patients Waiting", doctorDash: "DOCTOR DASHBOARD", call: "Call", finish: "Finish", dispense: "Dispense", recall: "Recall", getTicket: "Get Ticket", totalToday: "Total Today", waitingLabel: "Waiting", namePlaceholder: "Patient Name (Optional)", useSuggestion: "Use", localTime: "Local Time", testVoice: "Test Voice", systemSettings: "System Settings", interfaceLang: "Secondary Language Mode", langDesc: "Turn on Mandarin to show dual-language text and enable bilingual voice announcements." },
+            zh: { pharmacy: "药剂处领药", ready: "就绪", nowCalling: "正在传召", standingBy: "准备就绪", healthTips: "诊所通告", load: "候诊人数", waiting: "人正在等待", doctorDash: "医生控制台", call: "呼叫", finish: "完成", dispense: "发药", recall: "重召", getTicket: "取票", totalToday: "今日总数", waitingLabel: "等待中", namePlaceholder: "患者姓名 (选填)", useSuggestion: "使用", localTime: "当地时间", testVoice: "测试语音", systemSettings: "系统设置", interfaceLang: "第二语言模式", langDesc: "开启中文将显示双语文字并启用双语语音播报。" }
         };
 
         const App = () => {
@@ -60,7 +60,7 @@
                 header: 'QueEasy Clinic',
                 tickerText: 'Welcome to QueEasy.',
                 showTicker: true,
-                lang: 'en'
+                lang: 'en' // 'en' = English Only, 'zh' = English + Mandarin
             });
             const [showSettings, setShowSettings] = React.useState(false);
             const [inputNum, setInputNum] = React.useState('');
@@ -68,7 +68,13 @@
             const [myRoom, setMyRoom] = React.useState('Room 1');
             const [audioUnlocked, setAudioUnlocked] = React.useState(false);
 
-            const t = i18n[config.lang] || i18n.en;
+            // Helper for Dual Text Rendering
+            const T = ({ k, className = "" }) => (
+                <div className={`flex flex-col leading-tight ${className}`}>
+                    <span>{i18n.en[k]}</span>
+                    {config.lang === 'zh' && <span className="text-[0.6em] opacity-80 font-normal tracking-normal">{i18n.zh[k]}</span>}
+                </div>
+            );
 
             React.useEffect(() => {
                 const unsubQ = db.collection("queue").orderBy("time", "desc").onSnapshot(s => setQueue(s.docs.map(d => ({id:d.id, ...d.data()}))));
@@ -80,44 +86,34 @@
             // === VOICE ENGINE ===
             const getVoice = (langCode) => {
                 const vs = window.speechSynthesis.getVoices();
-                if (langCode === 'zh') {
-                    // Look for Chinese mainland, taiwan, or general Chinese
-                    return vs.find(v => v.lang.includes('zh') || v.lang.includes('CN') || v.name.includes('Chinese'));
-                }
-                // Default English
+                if (langCode === 'zh') return vs.find(v => v.lang.includes('zh') || v.lang.includes('CN') || v.name.includes('Chinese'));
                 return vs.find(v => v.lang.startsWith('en-GB')) || vs.find(v => v.lang.startsWith('en'));
             };
 
             const speakDual = (num, loc) => {
                 window.speechSynthesis.cancel();
 
-                // 1. English Announcement
+                // 1. Always Speak English
                 const enText = `Number ${num}. Please proceed to ${loc}.`;
                 const uEn = new SpeechSynthesisUtterance(enText);
                 const vEn = getVoice('en');
                 if(vEn) uEn.voice = vEn;
                 uEn.rate = 0.9; 
+                window.speechSynthesis.speak(uEn);
 
-                // 2. Mandarin Announcement
-                // Translate logic: "Room 1" -> "1 Hao Fang"
-                const roomNum = loc.replace(/[^0-9]/g, ''); 
-                const zhText = `Qǐng ${num} hào, dào ${roomNum} hào fáng.`; // Pinyin/Text mix works for most engines
-                const zhTextCharacters = `请 ${num} 号, 到 ${roomNum} 号房`;
-                
-                const uZh = new SpeechSynthesisUtterance(zhTextCharacters);
-                const vZh = getVoice('zh');
-                
-                if (vZh) {
-                    uZh.voice = vZh;
-                    uZh.lang = vZh.lang;
-                    uZh.rate = 0.9;
+                // 2. Speak Mandarin only if config.lang is 'zh'
+                if (config.lang === 'zh') {
+                    const roomNum = loc.replace(/[^0-9]/g, ''); 
+                    const zhTextCharacters = `请 ${num} 号, 到 ${roomNum} 号房`;
+                    const uZh = new SpeechSynthesisUtterance(zhTextCharacters);
+                    const vZh = getVoice('zh');
                     
-                    // Queue them up: English first, then Mandarin
-                    window.speechSynthesis.speak(uEn);
-                    window.speechSynthesis.speak(uZh);
-                } else {
-                    // Fallback: If no Chinese voice, just speak English
-                    window.speechSynthesis.speak(uEn);
+                    if (vZh) {
+                        uZh.voice = vZh;
+                        uZh.lang = vZh.lang;
+                        uZh.rate = 0.9;
+                        window.speechSynthesis.speak(uZh);
+                    }
                 }
             };
 
@@ -136,10 +132,6 @@
                 }
             }, [currentCaller, audioUnlocked, view]);
 
-            const updateLang = (val) => {
-                db.collection("settings").doc("config").set({ ...config, lang: val }, { merge: true });
-            };
-
             return (
                 <div className="h-screen w-screen relative">
                     {/* TV VIEW */}
@@ -152,7 +144,7 @@
                                 </div>
                                 <div className="flex gap-6 items-center">
                                     <div className="text-right">
-                                        <p className="text-[10px] font-bold text-slate-500 uppercase">{t.localTime}</p>
+                                        <p className="text-[10px] font-bold text-slate-500 uppercase"><T k="localTime" /></p>
                                         <p className="text-3xl font-black mono-num">{new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
                                     </div>
                                     <button onClick={() => setAudioUnlocked(!audioUnlocked)} className={`w-12 h-12 rounded-xl flex items-center justify-center ${audioUnlocked ? 'bg-blue-600/20 text-blue-400' : 'bg-red-600 text-white animate-pulse'}`}>
@@ -162,31 +154,32 @@
                             </div>
                             <div className="flex-1 flex p-6 gap-6 mb-12">
                                 <div className="w-1/4 cyber-panel p-6">
-                                    <h3 className="text-amber-500 font-black text-xs uppercase mb-4">{t.pharmacy}</h3>
+                                    <h3 className="text-amber-500 font-black text-xs uppercase mb-4 tracking-widest"><T k="pharmacy" /></h3>
                                     {queue.filter(p=>p.status==='collecting').slice(0,5).map(p=>(
                                         <div key={p.id} className="flex justify-between items-center bg-white/5 p-4 rounded-xl mb-2 border border-white/5">
                                             <span className="text-4xl font-black text-amber-500 mono-num">{p.num}</span>
-                                            <span className="text-[10px] font-bold opacity-40">{t.ready}</span>
+                                            <div className="text-right text-[10px] font-bold opacity-40 uppercase"><T k="ready" /></div>
                                         </div>
                                     ))}
                                 </div>
                                 <div className="flex-1 cyber-panel border border-blue-500/20 flex flex-col items-center justify-center text-center">
                                     {currentCaller ? (
                                         <div>
-                                            <div className="bg-blue-600/10 text-blue-400 border border-blue-500/30 px-6 py-2 rounded-full text-sm font-black uppercase mb-8">{t.nowCalling}</div>
-                                            <h1 className="text-[15rem] font-black leading-none mono-num mb-8 text-blue-500">{currentCaller.num}</h1>
+                                            <div className="inline-block bg-blue-600/10 text-blue-400 border border-blue-500/30 px-8 py-3 rounded-2xl text-sm font-black uppercase mb-8"><T k="nowCalling" /></div>
+                                            <h1 className="text-[14rem] font-black leading-none mono-num mb-6 text-blue-500">{currentCaller.num}</h1>
                                             <div className="inline-block bg-white text-slate-950 px-16 py-6 rounded-2xl text-6xl font-black uppercase">{currentCaller.loc}</div>
                                         </div>
-                                    ) : <div className="opacity-10 text-4xl font-black">{t.standingBy}</div>}
+                                    ) : <div className="opacity-10 text-4xl font-black uppercase text-center"><T k="standingBy" /></div>}
                                 </div>
                                 <div className="w-1/4 cyber-panel p-4 flex flex-col">
-                                    <h3 className="text-blue-400 font-black text-xs uppercase mb-4">{t.healthTips}</h3>
+                                    <h3 className="text-blue-400 font-black text-xs uppercase mb-4 tracking-widest"><T k="healthTips" /></h3>
                                     <div className="flex-1 bg-black/40 rounded-2xl overflow-hidden">
                                         {slides.length > 0 ? <img src={slides[slideIndex]} className="slideshow-img" /> : <div className="p-8 text-center text-xs opacity-30">Upload photos in settings</div>}
                                     </div>
                                     <div className="mt-4 p-4 bg-white/5 rounded-xl text-center">
-                                        <p className="text-[10px] font-bold text-slate-400 mb-1 uppercase">{t.load}</p>
-                                        <p className="text-2xl font-black text-blue-400">{queue.filter(p=>p.status==='waiting').length} {t.waiting}</p>
+                                        <div className="text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-widest"><T k="load" /></div>
+                                        <p className="text-2xl font-black text-blue-400 mb-1">{queue.filter(p=>p.status==='waiting').length}</p>
+                                        <div className="text-[10px] opacity-60 uppercase"><T k="waiting" /></div>
                                     </div>
                                 </div>
                             </div>
@@ -195,21 +188,23 @@
                     ) : (
                         <div className="h-full bg-slate-50 p-8">
                             {view === 'reg' && (
-                                <div className="max-w-md mx-auto bento-card p-12 text-center mt-20">
+                                <div className="max-w-md mx-auto bento-card p-12 text-center mt-10">
                                     <h2 className="text-3xl font-black mb-8">{config.header}</h2>
                                     <input type="number" className="w-full text-center text-8xl font-black mono-num outline-none bg-transparent mb-8" placeholder="0000" value={inputNum} onChange={e=>setInputNum(e.target.value)} />
-                                    <input className="w-full bg-slate-100 p-6 rounded-3xl text-xl font-bold mb-4 text-center" placeholder={t.namePlaceholder} value={inputName} onChange={e=>setInputName(e.target.value)} />
+                                    <input className="w-full bg-slate-100 p-6 rounded-3xl text-xl font-bold mb-4 text-center" placeholder="Patient Name (Optional)" value={inputName} onChange={e=>setInputName(e.target.value)} />
                                     <button onClick={async () => {
                                         const n = inputNum || (queue.length ? Math.max(...queue.map(p=>parseInt(p.num)||0))+1 : 1001);
                                         await db.collection("queue").add({num:n, name:inputName||'Patient', status:'waiting', time:Date.now(), loc:'-'});
                                         setInputNum(''); setInputName('');
-                                    }} className="w-full bg-slate-900 text-white p-8 rounded-3xl text-2xl font-black uppercase">{t.getTicket}</button>
+                                    }} className="w-full bg-slate-900 text-white p-6 rounded-3xl font-black uppercase hover:scale-[1.02] transition-transform">
+                                        <T k="getTicket" className="text-2xl items-center" />
+                                    </button>
                                 </div>
                             )}
                             {view === 'admin' && (
                                 <div className="h-full flex flex-col">
                                     <div className="flex justify-between items-center mb-6">
-                                        <h2 className="text-xl font-black uppercase">{t.doctorDash}</h2>
+                                        <h2 className="text-xl font-black uppercase flex items-center gap-2"><T k="doctorDash" /></h2>
                                         <select value={myRoom} onChange={e=>setMyRoom(e.target.value)} className="bg-white px-4 py-2 rounded-xl font-bold border-2 border-slate-200">
                                             {config.rooms.map(r=><option key={r} value={r}>{r}</option>)}
                                         </select>
@@ -220,8 +215,8 @@
                                                 <p className="text-5xl font-black mono-num">{p.num}</p>
                                                 <p className="text-xs font-bold text-slate-400 mb-4">{p.name}</p>
                                                 <div className="grid grid-cols-2 gap-2">
-                                                    <button onClick={()=>db.collection("queue").doc(p.id).update({status:'calling', loc:myRoom, callTrigger:Date.now()})} className="bg-blue-600 text-white py-3 rounded-xl font-black text-xs uppercase">{t.call}</button>
-                                                    <button onClick={()=>db.collection("queue").doc(p.id).update({status:'collecting', loc:'Pharmacy'})} className="bg-slate-900 text-white py-3 rounded-xl font-black text-xs uppercase">{t.finish}</button>
+                                                    <button onClick={()=>db.collection("queue").doc(p.id).update({status:'calling', loc:myRoom, callTrigger:Date.now()})} className="bg-blue-600 text-white py-3 rounded-xl font-black text-xs uppercase flex items-center justify-center text-center"><T k="call" /></button>
+                                                    <button onClick={()=>db.collection("queue").doc(p.id).update({status:'collecting', loc:'Pharmacy'})} className="bg-slate-900 text-white py-3 rounded-xl font-black text-xs uppercase flex items-center justify-center text-center"><T k="finish" /></button>
                                                 </div>
                                             </div>
                                         ))}
@@ -244,17 +239,21 @@
                     {showSettings && (
                         <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[999] flex items-center justify-center p-6">
                             <div className="bg-white w-full max-w-lg rounded-[3rem] p-10 space-y-8">
-                                <div className="flex justify-between items-center"><h2 className="text-2xl font-black uppercase">Settings</h2><button onClick={()=>setShowSettings(false)} className="bg-slate-100 p-4 rounded-full"><i className="ri-close-line text-2xl"></i></button></div>
+                                <div className="flex justify-between items-center"><h2 className="text-2xl font-black uppercase"><T k="systemSettings" /></h2><button onClick={()=>setShowSettings(false)} className="bg-slate-100 p-4 rounded-full"><i className="ri-close-line text-2xl"></i></button></div>
                                 
                                 <div className="space-y-6">
                                     <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase block mb-3">System Interface Language</label>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase block mb-3"><T k="interfaceLang" /></label>
                                         <div className="flex gap-2">
-                                            <button onClick={()=>updateLang('en')} className={`flex-1 py-4 rounded-2xl font-black text-xs border-2 ${config.lang === 'en' ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-slate-100 text-slate-400'}`}>English</button>
-                                            <button onClick={()=>updateLang('zh')} className={`flex-1 py-4 rounded-2xl font-black text-xs border-2 ${config.lang === 'zh' ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-slate-100 text-slate-400'}`}>中文 (Mandarin)</button>
+                                            <button onClick={()=>db.collection("settings").doc("config").set({...config, lang:'en'}, {merge:true})} className={`flex-1 py-4 rounded-2xl font-black text-xs border-2 ${config.lang === 'en' ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-slate-100 text-slate-400'}`}>
+                                                OFF
+                                            </button>
+                                            <button onClick={()=>db.collection("settings").doc("config").set({...config, lang:'zh'}, {merge:true})} className={`flex-1 py-4 rounded-2xl font-black text-xs border-2 ${config.lang === 'zh' ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-slate-100 text-slate-400'}`}>
+                                                ON (中文)
+                                            </button>
                                         </div>
-                                        <p className="text-[10px] text-slate-400 mt-2 italic">* Note: Voice announcements will always be English followed by Mandarin.</p>
-                                        <button onClick={() => speakDual("1001", "Room 2")} className="w-full mt-2 py-2 text-[10px] font-bold text-blue-500 uppercase"><i className="ri-volume-up-line mr-2"></i>Test Dual Voice</button>
+                                        <p className="text-[10px] text-slate-400 mt-3 italic leading-relaxed"><T k="langDesc" /></p>
+                                        <button onClick={() => speakDual("1001", "Room 2")} className="w-full mt-4 py-3 bg-blue-50 rounded-xl text-[10px] font-bold text-blue-500 uppercase flex justify-center items-center"><i className="ri-volume-up-line mr-2"></i> <T k="testVoice" /></button>
                                     </div>
 
                                     <div className="border-t pt-6">
