@@ -47,7 +47,7 @@
 
         const i18n = {
             en: { pharmacy: "Pharmacy Collection", ready: "READY", nowCalling: "Now Calling", standingBy: "STANDING BY", healthTips: "Clinic Notices", load: "Queue Load", waiting: "Patients Waiting", doctorDash: "DOCTOR DASHBOARD", call: "Call", finish: "Finish", dispense: "Dispense", recall: "Recall", getTicket: "Get Ticket", totalToday: "Total Today", waitingLabel: "Waiting", namePlaceholder: "Patient Name (Optional)", useSuggestion: "Use", localTime: "Local Time", testVoice: "Test Voice" },
-            bm: { pharmacy: "Kutipan Farmasi", ready: "SEDIA", nowCalling: "Sedang Dipanggil", standingBy: "SEDIA BERKHIDMAT", healthTips: "Notis Klinik", load: "Beban Barisan", waiting: "Pesakit Menunggu", doctorDash: "PAPAN PEMUKA DOKTOR", call: "Panggil", finish: "Selesai", dispense: "Serah", recall: "Panggil Semula", getTicket: "Ambil Tiket", totalToday: "Jumlah Hari Ini", waitingLabel: "Menunggu", namePlaceholder: "Nama Pesakit (Pilihan)", useSuggestion: "Guna", localTime: "Waktu Tempatan", testVoice: "Uji Suara" }
+            zh: { pharmacy: "药剂处领药", ready: "就绪", nowCalling: "正在传召", standingBy: "准备就绪", healthTips: "诊所通告", load: "候诊人数", waiting: "人正在等待", doctorDash: "医生控制台", call: "呼叫", finish: "完成", dispense: "发药", recall: "重召", getTicket: "取票", totalToday: "今日总数", waitingLabel: "等待中", namePlaceholder: "患者姓名 (选填)", useSuggestion: "使用", localTime: "当地时间", testVoice: "测试语音" }
         };
 
         const App = () => {
@@ -66,7 +66,6 @@
             const [inputNum, setInputNum] = React.useState('');
             const [inputName, setInputName] = React.useState('');
             const [myRoom, setMyRoom] = React.useState('Room 1');
-            const [isPrinting, setIsPrinting] = React.useState(false);
             const [audioUnlocked, setAudioUnlocked] = React.useState(false);
 
             const t = i18n[config.lang] || i18n.en;
@@ -78,17 +77,48 @@
                 return () => { unsubQ(); unsubC(); };
             }, []);
 
-            const getVoice = (l) => {
+            // === VOICE ENGINE ===
+            const getVoice = (langCode) => {
                 const vs = window.speechSynthesis.getVoices();
-                return l === 'bm' ? vs.find(v => v.lang.includes('ms') || v.name.toLowerCase().includes('malay')) : vs.find(v => v.lang.startsWith('en'));
+                if (langCode === 'zh') {
+                    // Look for Chinese mainland, taiwan, or general Chinese
+                    return vs.find(v => v.lang.includes('zh') || v.lang.includes('CN') || v.name.includes('Chinese'));
+                }
+                // Default English
+                return vs.find(v => v.lang.startsWith('en-GB')) || vs.find(v => v.lang.startsWith('en'));
             };
 
-            const speak = (text, lang) => {
+            const speakDual = (num, loc) => {
                 window.speechSynthesis.cancel();
-                const u = new SpeechSynthesisUtterance(text);
-                const v = getVoice(lang);
-                if(v) { u.voice = v; u.lang = v.lang; } else { u.lang = lang === 'bm' ? 'ms-MY' : 'en-US'; }
-                window.speechSynthesis.speak(u);
+
+                // 1. English Announcement
+                const enText = `Number ${num}. Please proceed to ${loc}.`;
+                const uEn = new SpeechSynthesisUtterance(enText);
+                const vEn = getVoice('en');
+                if(vEn) uEn.voice = vEn;
+                uEn.rate = 0.9; 
+
+                // 2. Mandarin Announcement
+                // Translate logic: "Room 1" -> "1 Hao Fang"
+                const roomNum = loc.replace(/[^0-9]/g, ''); 
+                const zhText = `Qǐng ${num} hào, dào ${roomNum} hào fáng.`; // Pinyin/Text mix works for most engines
+                const zhTextCharacters = `请 ${num} 号, 到 ${roomNum} 号房`;
+                
+                const uZh = new SpeechSynthesisUtterance(zhTextCharacters);
+                const vZh = getVoice('zh');
+                
+                if (vZh) {
+                    uZh.voice = vZh;
+                    uZh.lang = vZh.lang;
+                    uZh.rate = 0.9;
+                    
+                    // Queue them up: English first, then Mandarin
+                    window.speechSynthesis.speak(uEn);
+                    window.speechSynthesis.speak(uZh);
+                } else {
+                    // Fallback: If no Chinese voice, just speak English
+                    window.speechSynthesis.speak(uEn);
+                }
             };
 
             const currentCaller = queue.find(p => p.status === 'calling' && p.callTrigger);
@@ -97,13 +127,14 @@
             React.useEffect(() => {
                 if(view === 'tv' && currentCaller && audioUnlocked && currentCaller.callTrigger > lastCallRef.current) {
                     lastCallRef.current = currentCaller.callTrigger;
-                    new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play();
-                    setTimeout(() => {
-                        const txt = config.lang === 'bm' ? `Nombor ${currentCaller.num}. Sila ke Bilik ${currentCaller.loc.replace('Room ', '')}` : `Number ${currentCaller.num}. Room ${currentCaller.loc.replace('Room ', '')}`;
-                        speak(txt, config.lang);
-                    }, 1300);
+                    const chime = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                    chime.play().then(() => {
+                        setTimeout(() => {
+                            speakDual(currentCaller.num, currentCaller.loc);
+                        }, 1300);
+                    });
                 }
-            }, [currentCaller, audioUnlocked, view, config.lang]);
+            }, [currentCaller, audioUnlocked, view]);
 
             const updateLang = (val) => {
                 db.collection("settings").doc("config").set({ ...config, lang: val }, { merge: true });
@@ -111,6 +142,7 @@
 
             return (
                 <div className="h-screen w-screen relative">
+                    {/* TV VIEW */}
                     {view === 'tv' ? (
                         <div className="h-full tv-screen flex flex-col overflow-hidden">
                             <div className="flex justify-between items-center px-10 py-6 cyber-panel rounded-none">
@@ -175,17 +207,25 @@
                                 </div>
                             )}
                             {view === 'admin' && (
-                                <div className="grid grid-cols-4 gap-6">
-                                    {queue.filter(p=>p.status!=='finished').map(p=>(
-                                        <div key={p.id} className="bento-card p-6 text-center">
-                                            <p className="text-5xl font-black mono-num">{p.num}</p>
-                                            <p className="text-xs font-bold text-slate-400 mb-4">{p.name}</p>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <button onClick={()=>db.collection("queue").doc(p.id).update({status:'calling', loc:myRoom, callTrigger:Date.now()})} className="bg-blue-600 text-white py-3 rounded-xl font-black text-xs uppercase">{t.call}</button>
-                                                <button onClick={()=>db.collection("queue").doc(p.id).update({status:'collecting', loc:'Pharmacy'})} className="bg-slate-900 text-white py-3 rounded-xl font-black text-xs uppercase">{t.finish}</button>
+                                <div className="h-full flex flex-col">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h2 className="text-xl font-black uppercase">{t.doctorDash}</h2>
+                                        <select value={myRoom} onChange={e=>setMyRoom(e.target.value)} className="bg-white px-4 py-2 rounded-xl font-bold border-2 border-slate-200">
+                                            {config.rooms.map(r=><option key={r} value={r}>{r}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="grid grid-cols-4 gap-6 overflow-y-auto pb-20">
+                                        {queue.filter(p=>p.status!=='finished').map(p=>(
+                                            <div key={p.id} className="bento-card p-6 text-center">
+                                                <p className="text-5xl font-black mono-num">{p.num}</p>
+                                                <p className="text-xs font-bold text-slate-400 mb-4">{p.name}</p>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <button onClick={()=>db.collection("queue").doc(p.id).update({status:'calling', loc:myRoom, callTrigger:Date.now()})} className="bg-blue-600 text-white py-3 rounded-xl font-black text-xs uppercase">{t.call}</button>
+                                                    <button onClick={()=>db.collection("queue").doc(p.id).update({status:'collecting', loc:'Pharmacy'})} className="bg-slate-900 text-white py-3 rounded-xl font-black text-xs uppercase">{t.finish}</button>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        ))}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -208,12 +248,13 @@
                                 
                                 <div className="space-y-6">
                                     <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase block mb-3">Language / Bahasa</label>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase block mb-3">System Interface Language</label>
                                         <div className="flex gap-2">
                                             <button onClick={()=>updateLang('en')} className={`flex-1 py-4 rounded-2xl font-black text-xs border-2 ${config.lang === 'en' ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-slate-100 text-slate-400'}`}>English</button>
-                                            <button onClick={()=>updateLang('bm')} className={`flex-1 py-4 rounded-2xl font-black text-xs border-2 ${config.lang === 'bm' ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-slate-100 text-slate-400'}`}>Bahasa Melayu</button>
+                                            <button onClick={()=>updateLang('zh')} className={`flex-1 py-4 rounded-2xl font-black text-xs border-2 ${config.lang === 'zh' ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-slate-100 text-slate-400'}`}>中文 (Mandarin)</button>
                                         </div>
-                                        <button onClick={() => speak(config.lang === 'bm' ? "Ujian suara bahasa melayu" : "Testing English voice", config.lang)} className="w-full mt-2 py-2 text-[10px] font-bold text-blue-500 uppercase"><i className="ri-volume-up-line mr-2"></i>{t.testVoice}</button>
+                                        <p className="text-[10px] text-slate-400 mt-2 italic">* Note: Voice announcements will always be English followed by Mandarin.</p>
+                                        <button onClick={() => speakDual("1001", "Room 2")} className="w-full mt-2 py-2 text-[10px] font-bold text-blue-500 uppercase"><i className="ri-volume-up-line mr-2"></i>Test Dual Voice</button>
                                     </div>
 
                                     <div className="border-t pt-6">
@@ -227,7 +268,11 @@
                                             }))).then(setSlides);
                                         }} className="w-full text-xs font-bold text-slate-400 file:bg-blue-50 file:text-blue-600 file:border-0 file:rounded-full file:px-4 file:py-2" />
                                     </div>
-                                    <button onClick={()=>{ if(confirm('Clear all data?')) queue.forEach(p=>db.collection("queue").doc(p.id).delete()) }} className="w-full bg-red-50 text-red-600 p-5 rounded-2xl font-black uppercase text-[10px]">Purge Data</button>
+                                    <div className="border-t pt-6">
+                                         <label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Clinic Name & Rooms</label>
+                                         <input className="w-full bg-slate-100 p-4 rounded-xl font-bold mb-2" value={config.header} onChange={e => db.collection("settings").doc("config").update({header: e.target.value})} />
+                                         <input className="w-full bg-slate-100 p-4 rounded-xl font-bold" value={config.rooms.join(',')} onChange={e => db.collection("settings").doc("config").update({rooms: e.target.value.split(',')})} />
+                                    </div>
                                 </div>
                             </div>
                         </div>
