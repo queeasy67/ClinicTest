@@ -17,39 +17,17 @@
     <style>
         :root { --accent: #3b82f6; --surface: #ffffff; --bg: #f8fafc; }
         body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: #0f172a; height: 100vh; overflow: hidden; }
-        
-        .bento-card {
-            background: var(--surface);
-            border-radius: 2.5rem;
-            box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.05);
-            border: 1px solid rgba(226, 232, 240, 0.8);
-        }
-
-        /* TV COMMAND CENTER UI */
+        .bento-card { background: var(--surface); border-radius: 2.5rem; box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.05); border: 1px solid rgba(226, 232, 240, 0.8); }
         .tv-screen { background: radial-gradient(circle at top right, #1e293b, #020617); color: #f8fafc; }
         .cyber-panel { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); border-radius: 2rem; }
-        
-        .hero-glow {
-            text-shadow: 0 0 30px rgba(59, 130, 246, 0.5);
-            animation: pulse-glow 2s infinite alternate;
-        }
-
-        @keyframes pulse-glow {
-            from { text-shadow: 0 0 20px rgba(59, 130, 246, 0.4); transform: scale(1); }
-            to { text-shadow: 0 0 50px rgba(59, 130, 246, 0.8); transform: scale(1.02); }
-        }
-
+        .hero-glow { text-shadow: 0 0 30px rgba(59, 130, 246, 0.5); animation: pulse-glow 2s infinite alternate; }
+        @keyframes pulse-glow { from { text-shadow: 0 0 20px rgba(59, 130, 246, 0.4); transform: scale(1); } to { text-shadow: 0 0 50px rgba(59, 130, 246, 0.8); transform: scale(1.02); } }
         .ticker-bar { background: linear-gradient(90deg, #1e40af, #3b82f6); height: 60px; display: flex; align-items: center; }
         .marquee-content { white-space: nowrap; display: inline-block; animation: marquee 30s linear infinite; font-weight: 800; font-size: 1.25rem; }
         @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
-
         .mono-num { font-family: 'JetBrains Mono', monospace; }
         .glass-nav { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
-        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-        
-        .media-container iframe, .media-container img, .media-container video {
-            width: 100%; height: 100%; object-fit: cover; border-radius: 1.5rem;
-        }
+        .slideshow-img { width: 100%; height: 100%; object-fit: cover; border-radius: 1.5rem; transition: opacity 1s ease-in-out; }
     </style>
 </head>
 <body>
@@ -69,16 +47,61 @@
         if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
         const db = firebase.firestore();
 
+        // Translation Dictionary
+        const i18n = {
+            en: {
+                pharmacy: "Pharmacy Collection",
+                ready: "READY",
+                nowCalling: "Now Calling",
+                standingBy: "STANDING BY",
+                healthTips: "Clinic Notices",
+                load: "Queue Load",
+                waiting: "Patients Waiting",
+                doctorDash: "DOCTOR DASHBOARD",
+                call: "Call",
+                finish: "Finish",
+                dispense: "Dispense",
+                recall: "Recall",
+                getTicket: "Get Ticket",
+                totalToday: "Total Today",
+                waitingLabel: "Waiting",
+                namePlaceholder: "Patient Name (Optional)",
+                useSuggestion: "Use",
+                localTime: "Local Time"
+            },
+            bm: {
+                pharmacy: "Kutipan Farmasi",
+                ready: "SEDIA",
+                nowCalling: "Sedang Dipanggil",
+                standingBy: "SEDIA BERKHIDMAT",
+                healthTips: "Notis Klinik",
+                load: "Beban Barisan",
+                waiting: "Pesakit Menunggu",
+                doctorDash: "PAPAN PEMUKA DOKTOR",
+                call: "Panggil",
+                finish: "Selesai",
+                dispense: "Serah",
+                recall: "Panggil Semula",
+                getTicket: "Ambil Tiket",
+                totalToday: "Jumlah Hari Ini",
+                waitingLabel: "Menunggu",
+                namePlaceholder: "Nama Pesakit (Pilihan)",
+                useSuggestion: "Guna",
+                localTime: "Waktu Tempatan"
+            }
+        };
+
         const App = () => {
             const [view, setView] = React.useState(localStorage.getItem('active_view') || 'tv');
+            const [lang, setLang] = React.useState('en');
             const [queue, setQueue] = React.useState([]);
+            const [slides, setSlides] = React.useState([]);
+            const [slideIndex, setSlideIndex] = React.useState(0);
             const [config, setConfig] = React.useState({
                 rooms: ['Room 1', 'Room 2', 'Room 3'],
                 header: 'QueEasy Clinic',
                 tickerText: 'Welcome to QueEasy. Your health is our priority.',
-                showTicker: true,
-                mediaUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=1&loop=1',
-                mediaType: 'youtube'
+                showTicker: true
             });
             const [showSettings, setShowSettings] = React.useState(false);
             const [inputNum, setInputNum] = React.useState('');
@@ -87,9 +110,9 @@
             const [isPrinting, setIsPrinting] = React.useState(false);
             const [audioUnlocked, setAudioUnlocked] = React.useState(false);
 
-            const lastCallRef = React.useRef(0);
-            const chime = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+            const t = i18n[lang];
 
+            // Firebase Sync
             React.useEffect(() => {
                 localStorage.setItem('active_view', view);
                 const unsubQ = db.collection("queue").orderBy("time", "desc").limit(100)
@@ -99,18 +122,48 @@
                 return () => { unsubQ(); unsubC(); };
             }, [view]);
 
+            // Slideshow Logic
+            React.useEffect(() => {
+                if (slides.length > 0) {
+                    const timer = setInterval(() => {
+                        setSlideIndex(prev => (prev + 1) % slides.length);
+                    }, 5000);
+                    return () => clearInterval(timer);
+                }
+            }, [slides]);
+
+            // Voice Call Logic
             const currentCaller = queue.find(p => p.status === 'calling' && p.callTrigger);
+            const lastCallRef = React.useRef(0);
+            const chime = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+
             React.useEffect(() => {
                 if(view === 'tv' && currentCaller && audioUnlocked && currentCaller.callTrigger > lastCallRef.current) {
                     lastCallRef.current = currentCaller.callTrigger;
                     chime.play().then(() => {
                         setTimeout(() => {
-                            const u = new SpeechSynthesisUtterance(`Number ${currentCaller.num}. Room ${currentCaller.loc.replace('Room', '')}`);
+                            const msg = lang === 'en' 
+                                ? `Number ${currentCaller.num}. Room ${currentCaller.loc.replace('Room ', '')}`
+                                : `Nombor ${currentCaller.num}. Bilik ${currentCaller.loc.replace('Room ', '')}`;
+                            const u = new SpeechSynthesisUtterance(msg);
+                            u.lang = lang === 'en' ? 'en-US' : 'ms-MY';
                             window.speechSynthesis.speak(u);
                         }, 1200);
                     });
                 }
-            }, [currentCaller, audioUnlocked, view]);
+            }, [currentCaller, audioUnlocked, view, lang]);
+
+            const handleFileUpload = (e) => {
+                const files = Array.from(e.target.files);
+                const readers = files.map(file => {
+                    return new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => resolve(e.target.result);
+                        reader.readAsDataURL(file);
+                    });
+                });
+                Promise.all(readers).then(images => setSlides(images));
+            };
 
             const suggestedNumber = React.useMemo(() => {
                 const nums = queue.map(p => parseInt(p.num)).filter(n => !isNaN(n));
@@ -134,7 +187,6 @@
                 setTimeout(() => setIsPrinting(false), 1500);
             };
 
-            // --- 📺 UPDATED TV VIEW ---
             const TvView = () => (
                 <div className="h-full tv-screen flex flex-col relative overflow-hidden">
                     <div className="flex justify-between items-center px-10 py-6 cyber-panel border-b border-white/10 rounded-none">
@@ -144,9 +196,12 @@
                         </div>
                         <div className="flex gap-10 items-center">
                             <div className="text-right">
-                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Local Time</p>
+                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t.localTime}</p>
                                 <p className="text-3xl font-black mono-num">{new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
                             </div>
+                            <button onClick={() => setLang(lang === 'en' ? 'bm' : 'en')} className="px-4 py-2 bg-white/10 rounded-lg font-bold text-xs border border-white/10 uppercase tracking-widest">
+                                {lang === 'en' ? 'Bahasa Melayu' : 'English'}
+                            </button>
                             <button onClick={() => setAudioUnlocked(!audioUnlocked)} className={`w-12 h-12 rounded-xl flex items-center justify-center ${audioUnlocked ? 'bg-blue-600/20 text-blue-400' : 'bg-red-600 text-white animate-pulse'}`}>
                                 <i className={audioUnlocked ? "ri-volume-up-fill text-xl" : "ri-volume-mute-fill text-xl"}></i>
                             </button>
@@ -154,47 +209,44 @@
                     </div>
 
                     <div className="flex-1 flex p-6 gap-6 mb-[60px]">
-                        {/* LEFT: PHARMACY */}
                         <div className="w-1/4 flex flex-col gap-6">
                             <div className="flex-1 cyber-panel p-6">
-                                <h3 className="text-amber-500 font-black text-xs uppercase tracking-[0.2em] mb-4">Pharmacy Collection</h3>
+                                <h3 className="text-amber-500 font-black text-xs uppercase tracking-[0.2em] mb-4">{t.pharmacy}</h3>
                                 <div className="space-y-3">
                                     {queue.filter(p=>p.status==='collecting').slice(0, 5).map(p => (
                                         <div key={p.id} className="flex justify-between items-center bg-white/5 p-4 rounded-xl border border-white/5">
                                             <span className="text-4xl font-black mono-num text-amber-500">{p.num}</span>
-                                            <span className="text-[10px] font-black opacity-40">READY</span>
+                                            <span className="text-[10px] font-black opacity-40">{t.ready}</span>
                                         </div>
                                     ))}
                                 </div>
                             </div>
                         </div>
 
-                        {/* CENTER: NOW CALLING */}
                         <div className="flex-1 cyber-panel border border-blue-500/20 flex flex-col items-center justify-center text-center">
                             {currentCaller ? (
                                 <div className="z-10">
-                                    <div className="bg-blue-600/10 text-blue-400 border border-blue-500/30 px-6 py-2 rounded-full text-sm font-black uppercase tracking-[0.5em] mb-8 animate-pulse">Now Calling</div>
+                                    <div className="bg-blue-600/10 text-blue-400 border border-blue-500/30 px-6 py-2 rounded-full text-sm font-black uppercase tracking-[0.5em] mb-8 animate-pulse">{t.nowCalling}</div>
                                     <h1 className="text-[18rem] font-black leading-none tracking-tighter hero-glow mono-num mb-8">{currentCaller.num}</h1>
                                     <div className="inline-block bg-white text-slate-950 px-16 py-6 rounded-2xl text-6xl font-black uppercase tracking-tight">{currentCaller.loc}</div>
                                 </div>
                             ) : (
-                                <div className="opacity-10 text-center"><i className="ri-stethoscope-line text-[12rem]"></i><p className="text-4xl font-black">STANDING BY</p></div>
+                                <div className="opacity-10 text-center"><i className="ri-stethoscope-line text-[12rem]"></i><p className="text-4xl font-black uppercase tracking-widest">{t.standingBy}</p></div>
                             )}
                         </div>
 
-                        {/* RIGHT: MEDIA / ANNOUNCEMENTS */}
                         <div className="w-1/4 cyber-panel p-4 flex flex-col">
-                            <h3 className="text-blue-400 font-black text-xs uppercase tracking-[0.2em] mb-4">Health Tips & Info</h3>
-                            <div className="flex-1 media-container bg-black/40 rounded-2xl overflow-hidden">
-                                {config.mediaType === 'youtube' ? (
-                                    <iframe src={config.mediaUrl} frameBorder="0" allow="autoplay; encrypted-media" allowFullScreen></iframe>
+                            <h3 className="text-blue-400 font-black text-xs uppercase tracking-[0.2em] mb-4">{t.healthTips}</h3>
+                            <div className="flex-1 bg-black/40 rounded-2xl overflow-hidden relative">
+                                {slides.length > 0 ? (
+                                    <img src={slides[slideIndex]} className="slideshow-img" />
                                 ) : (
-                                    <img src={config.mediaUrl} alt="Announcement" />
+                                    <div className="w-full h-full flex items-center justify-center text-slate-600 text-xs text-center p-8">No slides uploaded. Add images in Settings.</div>
                                 )}
                             </div>
                             <div className="mt-4 p-4 bg-white/5 rounded-xl text-center">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Queue Load</p>
-                                <p className="text-2xl font-black text-blue-400">{queue.filter(p=>p.status==='waiting').length} Patients Waiting</p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{t.load}</p>
+                                <p className="text-2xl font-black text-blue-400">{queue.filter(p=>p.status==='waiting').length} {t.waiting}</p>
                             </div>
                         </div>
                     </div>
@@ -207,109 +259,82 @@
                 </div>
             );
 
-            // --- ADMIN / SETTINGS (MEDIA CONTROLS ADDED) ---
             const SettingsModal = () => (
                 <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[999] flex items-center justify-center p-6">
                     <div className="bg-white w-full max-w-xl rounded-[3rem] p-10 space-y-8 overflow-y-auto max-h-[90vh]">
                         <div className="flex justify-between items-center"><h2 className="text-2xl font-black uppercase tracking-tighter">System Console</h2><button onClick={()=>setShowSettings(false)} className="bg-slate-100 p-4 rounded-full"><i className="ri-close-line text-2xl"></i></button></div>
-                        
                         <div className="space-y-6">
                             <div>
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Lobby Media URL</label>
-                                <input className="w-full bg-slate-100 p-4 rounded-xl font-bold text-sm" placeholder="Paste YouTube link or Image URL" value={config.mediaUrl} onChange={e => db.collection("settings").doc("config").update({mediaUrl: e.target.value})} />
-                                <div className="flex gap-2 mt-2">
-                                    {['youtube', 'image'].map(t => (
-                                        <button key={t} onClick={()=>db.collection("settings").doc("config").update({mediaType: t})} className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase ${config.mediaType === t ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'}`}>{t}</button>
-                                    ))}
-                                </div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Upload Slideshow Images</label>
+                                <input type="file" multiple accept="image/*" onChange={handleFileUpload} className="w-full text-xs font-bold text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-black file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+                                <p className="text-[9px] text-slate-400 mt-2 italic">*Note: Images are stored locally in this browser session.</p>
                             </div>
-
                             <div className="border-t pt-6">
                                 <div className="flex justify-between items-center mb-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ticker Toggles</label>
                                 <button onClick={() => db.collection("settings").doc("config").update({showTicker: !config.showTicker})} className={`px-4 py-1 rounded-full font-black text-[10px] ${config.showTicker ? 'bg-blue-600 text-white' : 'bg-slate-200'}`}>{config.showTicker ? 'ON' : 'OFF'}</button></div>
                                 <textarea className="w-full bg-slate-100 p-4 rounded-xl font-bold text-sm h-20" value={config.tickerText} onChange={e => db.collection("settings").doc("config").update({tickerText: e.target.value})} />
                             </div>
-
-                            <div className="border-t pt-6">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Clinic & Rooms</label>
-                                <input className="w-full bg-slate-100 p-4 rounded-xl font-bold mb-2" value={config.header} onChange={e => db.collection("settings").doc("config").update({header: e.target.value})} />
-                                <input className="w-full bg-slate-100 p-4 rounded-xl font-bold" value={config.rooms.join(',')} onChange={e => db.collection("settings").doc("config").update({rooms: e.target.value.split(',')})} />
-                            </div>
-
                             <button onClick={()=>{ if(confirm('Delete all data?')) queue.forEach(p=>db.collection("queue").doc(p.id).delete()) }} className="w-full bg-red-50 text-red-600 p-5 rounded-2xl font-black uppercase tracking-widest text-[10px]">Purge Data</button>
                         </div>
                     </div>
                 </div>
             );
 
-            // --- VIEW CONDITIONAL RENDERING ---
-            const renderView = () => {
-                switch(view) {
-                    case 'reg': return (
+            return (
+                <div className="h-screen w-screen relative">
+                    {view === 'tv' && <TvView />}
+                    {view === 'reg' && (
                         <div className="h-full flex p-8 gap-8 bg-slate-50">
                             <div className="w-1/3 flex flex-col gap-6">
-                                <div className="flex-1 bento-card p-8 flex flex-col justify-center text-center"><span className="text-slate-400 font-bold text-[10px] uppercase mb-2">Total Today</span><span className="text-8xl font-black text-slate-800">{queue.length}</span></div>
-                                <div className="flex-1 bento-card p-8 flex flex-col justify-center text-center bg-blue-600 text-white border-none shadow-xl"><span className="opacity-60 font-bold text-[10px] uppercase mb-2">Waiting</span><span className="text-8xl font-black">{queue.filter(p=>p.status==='waiting').length}</span></div>
+                                <div className="flex-1 bento-card p-8 flex flex-col justify-center text-center"><span className="text-slate-400 font-bold text-[10px] uppercase mb-2">{t.totalToday}</span><span className="text-8xl font-black text-slate-800">{queue.length}</span></div>
+                                <div className="flex-1 bento-card p-8 flex flex-col justify-center text-center bg-blue-600 text-white border-none shadow-xl"><span className="opacity-60 font-bold text-[10px] uppercase mb-2">{t.waitingLabel}</span><span className="text-8xl font-black">{queue.filter(p=>p.status==='waiting').length}</span></div>
                             </div>
                             <div className="flex-1 bento-card p-12 flex flex-col items-center justify-center relative">
                                 {isPrinting && <div className="absolute inset-0 bg-white/90 z-20 flex flex-col items-center justify-center rounded-[2.5rem]"><div className="w-16 h-16 border-8 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div><h2 className="text-2xl font-black">PRINTING...</h2></div>}
                                 <div className="text-center w-full max-w-md">
                                     <input type="number" className="w-full text-center text-[120px] font-black mono-num outline-none bg-transparent mb-2" placeholder={suggestedNumber} value={inputNum} onChange={e=>setInputNum(e.target.value)} />
-                                    <button onClick={()=>setInputNum(suggestedNumber.toString())} className={`mb-10 px-6 py-2 rounded-full font-black text-xs transition-all ${inputNum === suggestedNumber.toString() ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-600'}`}>Use: {suggestedNumber}</button>
-                                    <input className="w-full bg-slate-100 p-6 rounded-3xl text-xl font-bold mb-4 text-center" placeholder="Patient Name (Optional)" value={inputName} onChange={e=>setInputName(e.target.value)} />
-                                    <button onClick={issueTicket} className="w-full bg-slate-900 text-white p-8 rounded-3xl text-2xl font-black uppercase tracking-widest shadow-2xl">Get Ticket</button>
+                                    <button onClick={()=>setInputNum(suggestedNumber.toString())} className={`mb-10 px-6 py-2 rounded-full font-black text-xs transition-all ${inputNum === suggestedNumber.toString() ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-600'}`}>{t.useSuggestion}: {suggestedNumber}</button>
+                                    <input className="w-full bg-slate-100 p-6 rounded-3xl text-xl font-bold mb-4 text-center" placeholder={t.namePlaceholder} value={inputName} onChange={e=>setInputName(e.target.value)} />
+                                    <button onClick={issueTicket} className="w-full bg-slate-900 text-white p-8 rounded-3xl text-2xl font-black uppercase tracking-widest shadow-2xl">{t.getTicket}</button>
                                 </div>
                             </div>
                         </div>
-                    );
-                    case 'tv': return <TvView />;
-                    case 'admin': return (
+                    )}
+                    {view === 'admin' && (
                         <div className="h-full flex flex-col bg-slate-50">
                             <header className="h-20 bg-white border-b px-8 flex items-center justify-between">
-                                <h2 className="font-black text-xl">DOCTOR DASHBOARD</h2>
-                                <select value={myRoom} onChange={e=>setMyRoom(e.target.value)} className="bg-slate-100 font-black text-xs px-4 py-2 rounded-xl outline-none">
-                                    {config.rooms.map(r => <option key={r} value={r}>{r}</option>)}
-                                </select>
+                                <h2 className="font-black text-xl">{t.doctorDash}</h2>
+                                <div className="flex gap-4">
+                                    <button onClick={() => setLang(lang === 'en' ? 'bm' : 'en')} className="px-4 py-1 bg-slate-100 rounded-lg text-[10px] font-black uppercase">{lang}</button>
+                                    <select value={myRoom} onChange={e=>setMyRoom(e.target.value)} className="bg-slate-100 font-black text-xs px-4 py-2 rounded-xl outline-none">{config.rooms.map(r => <option key={r} value={r}>{r}</option>)}</select>
+                                </div>
                             </header>
                             <main className="flex-1 overflow-y-auto p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                                 {queue.filter(p => p.status !== 'finished' && p.status !== 'collecting').map(p => (
                                     <div key={p.id} className={`bento-card p-6 border-2 transition-all ${p.status === 'calling' ? 'border-blue-500 ring-8 ring-blue-50' : 'border-transparent'}`}>
-                                        <div className="flex justify-between items-start mb-6"><span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase ${p.status==='calling'?'bg-blue-600 text-white':'bg-slate-100 text-slate-400'}`}>{p.status}</span>
-                                        <button onClick={()=>db.collection("queue").doc(p.id).delete()} className="text-slate-200 hover:text-red-500"><i className="ri-close-circle-fill text-2xl"></i></button></div>
+                                        <div className="flex justify-between items-start mb-6"><span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase ${p.status==='calling'?'bg-blue-600 text-white':'bg-slate-100 text-slate-400'}`}>{p.status}</span></div>
                                         <div className="text-center mb-8"><p className="text-6xl font-black text-slate-800 mono-num mb-1">{p.num}</p><p className="text-xs font-bold text-slate-400 truncate">{p.name}</p></div>
-                                        <div className="grid grid-cols-2 gap-3"><button onClick={()=>handleAction(p.id, 'calling', myRoom)} className="bg-blue-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase">Call</button>
-                                        <button onClick={()=>handleAction(p.id, 'collecting', 'Pharmacy')} className="bg-slate-900 text-white py-4 rounded-2xl font-black text-[10px] uppercase">Finish</button></div>
+                                        <div className="grid grid-cols-2 gap-3"><button onClick={()=>handleAction(p.id, 'calling', myRoom)} className="bg-blue-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase">{t.call}</button>
+                                        <button onClick={()=>handleAction(p.id, 'collecting', 'Pharmacy')} className="bg-slate-900 text-white py-4 rounded-2xl font-black text-[10px] uppercase">{t.finish}</button></div>
                                     </div>
                                 ))}
                             </main>
                         </div>
-                    );
-                    case 'pharmacy': return (
+                    )}
+                    {view === 'pharmacy' && (
                         <div className="h-full bg-slate-50 flex flex-col">
-                            <header className="h-20 bg-white border-b px-8 flex items-center justify-between"><h2 className="font-black text-xl text-amber-600 uppercase tracking-tighter">Pharmacy</h2></header>
+                            <header className="h-20 bg-white border-b px-8 flex items-center justify-between"><h2 className="font-black text-xl text-amber-600 uppercase tracking-tighter">{t.pharmacy}</h2></header>
                             <main className="flex-1 overflow-y-auto p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                                 {queue.filter(p => p.status === 'collecting').map(p => (
                                     <div key={p.id} className="bento-card p-6 border-2 border-amber-200"><div className="text-center my-8"><p className="text-7xl font-black text-slate-800 mono-num">{p.num}</p><p className="text-xs font-bold text-slate-400 mt-2 uppercase">{p.name}</p></div>
-                                    <div className="grid grid-cols-2 gap-3"><button onClick={()=>handleAction(p.id, 'collecting', 'Pharmacy')} className="bg-amber-500 text-white py-4 rounded-2xl font-black text-[10px] uppercase">Recall</button>
-                                    <button onClick={()=>handleAction(p.id, 'finished', '-')} className="bg-slate-900 text-white py-4 rounded-2xl font-black text-[10px] uppercase">Dispense</button></div></div>
+                                    <div className="grid grid-cols-2 gap-3"><button onClick={()=>handleAction(p.id, 'collecting', 'Pharmacy')} className="bg-amber-500 text-white py-4 rounded-2xl font-black text-[10px] uppercase">{t.recall}</button>
+                                    <button onClick={()=>handleAction(p.id, 'finished', '-')} className="bg-slate-900 text-white py-4 rounded-2xl font-black text-[10px] uppercase">{t.dispense}</button></div></div>
                                 ))}
                             </main>
                         </div>
-                    );
-                    default: return null;
-                }
-            };
-
-            return (
-                <div className="h-screen w-screen relative">
-                    {renderView()}
+                    )}
                     <div className="fixed bottom-8 left-1/2 -translate-x-1/2 glass-nav px-3 py-3 rounded-full flex gap-2 items-center z-[100] shadow-2xl">
-                        {[
-                            {id:'reg', icon:'ri-add-line', label:'Kiosk'},
-                            {id:'tv', icon:'ri-tv-line', label:'TV'},
-                            {id:'admin', icon:'ri-stethoscope-line', label:'Doctor'},
-                            {id:'pharmacy', icon:'ri-capsule-line', label:'Pharmacy'}
-                        ].map(item => (
+                        {[{id:'reg', icon:'ri-add-line', label:'Kiosk'},{id:'tv', icon:'ri-tv-line', label:'TV'},{id:'admin', icon:'ri-stethoscope-line', label:'Doctor'},{id:'pharmacy', icon:'ri-capsule-line', label:'Pharmacy'}].map(item => (
                             <button key={item.id} onClick={() => setView(item.id)} className={`flex items-center gap-2 px-6 py-3 rounded-full transition-all duration-500 ${view === item.id ? 'bg-blue-600 text-white shadow-xl shadow-blue-900/40' : 'text-slate-400 hover:bg-white/10'}`}>
                                 <i className={`${item.icon} text-lg`}></i>
                                 {view === item.id && <span className="text-[10px] font-black uppercase tracking-widest">{item.label}</span>}
