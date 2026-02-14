@@ -15,8 +15,8 @@
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
 
     <style>
-        :root { --accent: #3b82f6; --surface: #0047AB; --bg: #00CED1; } 
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #f8fafc; color: #000; height: 100vh; overflow: hidden; margin: 0; }
+        :root { --accent: #3b82f6; --surface: #0047AB; --bg: #00CED1; --pharmacy-orange: #F28C28; --light-orange: #FFBD70; } 
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #ffffff; color: #000; height: 100vh; overflow: hidden; margin: 0; }
         
         /* TV Layout */
         .tv-body { background: var(--bg); }
@@ -29,15 +29,13 @@
         @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
 
         /* Console Styles */
-        .console-btn { background: #9ca3af; color: black; font-weight: 800; padding: 12px 24px; border-radius: 8px; text-transform: uppercase; transition: 0.2s; font-size: 0.9rem; border: 2px solid transparent; }
-        .console-btn:hover { background: #d1d5db; }
-        .console-btn.active { background: #4b5563; color: white; border-color: #374151; }
+        .console-btn { background: #B4B4B4; color: black; font-weight: 800; padding: 8px 20px; border-radius: 8px; text-transform: uppercase; transition: 0.2s; font-size: 0.85rem; }
+        .console-btn.active { background: #505050; color: white; }
         
         /* Custom Scrollbar */
         .custom-scroll::-webkit-scrollbar { width: 8px; }
-        .custom-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 4px; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 4px; }
-        .custom-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.5); }
+        .custom-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.05); border-radius: 10px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }
 
         .mono-num { font-family: 'JetBrains Mono', monospace; font-weight: 800; }
         .slideshow-img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
@@ -66,8 +64,7 @@
         };
 
         const App = () => {
-            // Views: 'tv', 'reg', 'doctor', 'pharmacy'
-            const [view, setView] = React.useState(localStorage.getItem('active_view') || 'tv');
+            const [view, setView] = React.useState(localStorage.getItem('active_view') || 'reg');
             const [queue, setQueue] = React.useState([]);
             const [slides, setSlides] = React.useState([]);
             const [slideIndex, setSlideIndex] = React.useState(0);
@@ -76,7 +73,6 @@
             const [audioUnlocked, setAudioUnlocked] = React.useState(false);
             const [myRoom, setMyRoom] = React.useState('Room 1');
             
-            // Registration inputs
             const [inputNum, setInputNum] = React.useState('');
             const [inputName, setInputName] = React.useState('');
 
@@ -123,254 +119,194 @@
                 }
             }, [currentCaller, audioUnlocked, view]);
 
-            // --- RENDER HELPERS ---
-            const renderClock = () => (
-                <div className="text-right">
-                    <div className="text-4xl font-bold uppercase text-black leading-none">
-                        {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </div>
-                    <div className="text-sm font-bold opacity-60 uppercase text-black">
-                        {new Date().toLocaleDateString([], {weekday: 'long', day: 'numeric', month: 'long'})}
-                    </div>
-                </div>
-            );
+            const addTicket = async () => {
+                const nextSug = queue.length ? Math.max(...queue.map(p=>parseInt(p.num)||0)) + 1 : 1001;
+                const n = inputNum || nextSug;
+                await db.collection("queue").add({num:n, name:inputName||'Patient', status:'waiting', time:Date.now(), loc:'-'});
+                setInputNum(''); setInputName('');
+            };
 
-            // Updated Navigation Tabs
-            const renderConsoleNav = () => (
-                <div className="flex gap-3 justify-center mb-8">
-                    <button onClick={() => setView('reg')} className={`console-btn ${view==='reg'?'active':''}`}>REG</button>
-                    <button onClick={() => setView('doctor')} className={`console-btn ${view==='doctor'?'active':''}`}>DOCTOR</button>
-                    <button onClick={() => setView('pharmacy')} className={`console-btn ${view==='pharmacy'?'active':''}`}>PHARMACY</button>
-                    <button onClick={() => setView('tv')} className="console-btn">TV DISPLAY</button>
+            const renderHeader = (title) => (
+                <div className="flex justify-between items-start mb-4">
+                    <div className="flex flex-col gap-4">
+                        <div className="flex gap-2">
+                            <button onClick={() => setView('reg')} className={`console-btn ${view==='reg'?'active':''}`}>REG</button>
+                            <button onClick={() => setView('doctor')} className={`console-btn ${view==='doctor'?'active':''}`}>DOCTOR</button>
+                            <button onClick={() => setView('pharmacy')} className={`console-btn ${view==='pharmacy'?'active':''}`}>PHARMACY</button>
+                            <button onClick={() => setView('tv')} className="console-btn">TV</button>
+                        </div>
+                        <h2 className="text-4xl font-black text-[#0047AB] uppercase tracking-tighter">{title}</h2>
+                    </div>
+                    <div className="flex items-center gap-6">
+                        <div className="text-right">
+                            <div className="text-4xl font-bold uppercase leading-none">
+                                {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            </div>
+                            <div className="text-sm font-bold opacity-60 uppercase">
+                                {new Date().toLocaleDateString([], {weekday: 'long', day: 'numeric', month: 'long'})}
+                            </div>
+                        </div>
+                        <button onClick={() => setShowSettings(true)} className="text-gray-400 hover:text-black transition-colors">
+                            <i className="ri-settings-4-fill text-3xl"></i>
+                        </button>
+                    </div>
                 </div>
             );
 
             return (
-                <div className={`h-screen w-screen relative ${view === 'tv' ? 'tv-body' : 'bg-slate-50'}`}>
+                <div className={`h-screen w-screen relative overflow-hidden ${view === 'tv' ? 'tv-body' : 'bg-white'}`}>
                     
                     {/* === TV VIEW === */}
                     {view === 'tv' && (
                         <div className="tv-container relative">
-                            {/* HOME BUTTON (Back to Reg) */}
-                            <button 
-                                onClick={() => setView('reg')} 
-                                className="absolute top-4 left-4 z-50 w-10 h-10 bg-black/10 hover:bg-black/40 rounded-full flex items-center justify-center text-white/50 hover:text-white transition-all backdrop-blur-sm"
-                                title="Back to Registration"
-                            >
-                                <i className="ri-dashboard-line text-xl"></i>
-                            </button>
-
-                            <div className="flex justify-between items-start pl-12"> {/* Added padding for icon */}
+                            <button onClick={() => setView('reg')} className="absolute top-4 left-4 z-50 w-10 h-10 bg-black/10 hover:bg-black/40 rounded-full flex items-center justify-center text-white/50 transition-all"><i className="ri-home-fill text-xl"></i></button>
+                            <div className="flex justify-between items-start pl-12">
                                 <h1 className="text-6xl font-black italic tracking-tighter">{config.header}</h1>
-                                <div>
-                                    {renderClock()}
-                                    <button onClick={() => setAudioUnlocked(!audioUnlocked)} className="text-xs font-black mt-2 underline block text-right">
-                                        {audioUnlocked ? "AUDIO ON" : "CLICK TO UNMUTE"}
-                                    </button>
+                                <div className="flex items-center gap-4">
+                                    <div className="text-right text-black">
+                                        <div className="text-4xl font-bold uppercase leading-none">{new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                                        <div className="text-sm font-bold opacity-60 uppercase">{new Date().toLocaleDateString([], {weekday: 'long', day: 'numeric', month: 'long'})}</div>
+                                    </div>
+                                    <button onClick={() => setShowSettings(true)} className="text-black/30 hover:text-black"><i className="ri-settings-4-fill text-2xl"></i></button>
                                 </div>
                             </div>
-
                             <div className="main-content">
                                 <div className="flex flex-col gap-4">
                                     <div className="box-blue h-1/2 p-6 text-center">
                                         <div className="text-3xl font-bold mb-2"><T k="calling" /></div>
-                                        <div className="text-[100px] leading-none mono-num mb-2">
-                                            {currentCaller ? currentCaller.num : "##"}
-                                        </div>
-                                        <div className="text-3xl font-bold uppercase">
-                                            {currentCaller ? currentCaller.loc : <T k="location" />}
-                                        </div>
+                                        <div className="text-[100px] leading-none mono-num mb-2">{currentCaller ? currentCaller.num : "##"}</div>
+                                        <div className="text-3xl font-bold uppercase">{currentCaller ? currentCaller.loc : <T k="location" />}</div>
                                     </div>
                                     <div className="box-gray flex-1">
-                                        <div className="flex justify-between border-b-2 border-black/20 pb-2 mb-2 font-bold text-sm">
-                                            <T k="number" />
-                                            <T k="location" />
+                                        <div className="flex justify-between border-b-2 border-black/20 pb-2 mb-2 font-bold text-sm"><T k="number" /><T k="location" /></div>
+                                        <div className="space-y-2">{queue.filter(p => p.status === 'collecting').slice(0, 5).map(p => (
+                                            <div key={p.id} className="flex justify-between text-2xl font-black italic"><span>{p.num}</span><span>PHARMACY</span></div>
+                                        ))}</div>
+                                    </div>
+                                </div>
+                                <div className="box-blue relative overflow-hidden">
+                                    {slides.length > 0 ? <img src={slides[slideIndex]} className="slideshow-img" /> : <div className="text-4xl font-bold text-white/20">IMAGE SLIDESHOW</div>}
+                                </div>
+                            </div>
+                            <div className="ticker-bar"><div className="marquee-content uppercase">{config.tickerText}</div></div>
+                        </div>
+                    )}
+
+                    {/* === REGISTRATION VIEW (NEW DESIGN) === */}
+                    {view === 'reg' && (
+                        <div className="p-8 h-full flex flex-col">
+                            {renderHeader("HOME")}
+                            <div className="flex-1 grid grid-cols-12 gap-8 overflow-hidden">
+                                {/* Left Form Panel */}
+                                <div className="col-span-4 bg-[#F28C28] rounded-[2rem] p-10 flex flex-col items-center shadow-lg">
+                                    <div className="w-full space-y-8">
+                                        <div className="text-center">
+                                            <label className="block text-white font-bold text-xl mb-3">Que Number</label>
+                                            <input type="number" value={inputNum} onChange={e=>setInputNum(e.target.value)} placeholder="####" className="w-full bg-white rounded-2xl py-6 text-center text-4xl font-black mono-num outline-none border-4 border-transparent focus:border-white/50 transition-all shadow-inner"/>
+                                            <p className="text-white/70 text-sm font-bold mt-2 italic">Suggested: {queue.length ? Math.max(...queue.map(p=>parseInt(p.num)||0)) + 1 : 1001}</p>
                                         </div>
-                                        <div className="space-y-2">
-                                            {queue.filter(p => p.status === 'collecting').slice(0, 5).map(p => (
-                                                <div key={p.id} className="flex justify-between text-2xl font-black italic">
-                                                    <span>{p.num}</span>
-                                                    <span>Pharmacy</span>
+                                        <div className="text-center">
+                                            <label className="block text-white font-bold text-xl mb-3">Name</label>
+                                            <input type="text" value={inputName} onChange={e=>setInputName(e.target.value)} placeholder="PATIENT NAME" className="w-full bg-white rounded-2xl py-4 text-center text-xl font-bold outline-none border-4 border-transparent focus:border-white/50 transition-all shadow-inner uppercase"/>
+                                        </div>
+                                        <div className="space-y-3 pt-4">
+                                            <button onClick={addTicket} className="w-full bg-white text-[#F28C28] py-4 rounded-2xl text-xl font-black uppercase hover:scale-[1.02] transition-transform shadow-md">Add to que</button>
+                                            <button onClick={addTicket} className="w-full bg-white text-[#F28C28] py-4 rounded-2xl text-xl font-black uppercase hover:scale-[1.02] transition-transform shadow-md">Print ticket</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                {/* Right Live Que Panel */}
+                                <div className="col-span-8 flex flex-col overflow-hidden">
+                                    <h3 className="text-3xl font-black text-gray-400 mb-4 ml-4">Live Que</h3>
+                                    <div className="flex-1 bg-[#FFD580] rounded-[2rem] p-8 flex flex-col shadow-inner overflow-hidden">
+                                        <div className="grid grid-cols-2 text-black/80 font-black text-xl border-b-2 border-black/10 pb-4 mb-4 px-4 uppercase">
+                                            <span>Number</span>
+                                            <span>Location</span>
+                                        </div>
+                                        <div className="flex-1 overflow-y-auto custom-scroll pr-4 space-y-3">
+                                            {queue.filter(p => p.status !== 'finished').map(p => (
+                                                <div key={p.id} className="grid grid-cols-2 items-center bg-white/40 p-5 rounded-2xl transition-all">
+                                                    <span className="text-3xl font-black mono-num">{p.num}</span>
+                                                    <span className="text-xl font-bold uppercase text-black/60">{p.status === 'calling' ? p.loc : (p.status === 'collecting' ? 'PHARMACY' : 'WAITING')}</span>
                                                 </div>
                                             ))}
                                         </div>
                                     </div>
                                 </div>
-                                <div className="box-blue relative overflow-hidden">
-                                    {slides.length > 0 ? (
-                                        <img src={slides[slideIndex]} className="slideshow-img" />
-                                    ) : (
-                                        <div className="text-4xl font-bold text-white/20">IMAGE SLIDESHOW</div>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="ticker-bar">
-                                <div className="marquee-content uppercase">{config.tickerText}</div>
                             </div>
                         </div>
                     )}
 
-                    {/* === DOCTOR CONSOLE === */}
-                    {view === 'doctor' && (
+                    {/* === DOCTOR/PHARMACY CONSOLES === */}
+                    {(view === 'doctor' || view === 'pharmacy') && (
                         <div className="p-8 h-full flex flex-col">
-                            <div className="flex justify-between items-start mb-6">
-                                <div>
-                                    {renderConsoleNav()}
-                                    <h2 className="text-3xl font-bold text-[#0047AB] uppercase">Doctor Console</h2>
+                            {renderHeader(view === 'doctor' ? "Doctor Console" : "Pharmacy Console")}
+                            <div className={`flex-1 ${view === 'doctor' ? 'bg-[#0047AB]' : 'bg-[#F28C28]'} rounded-[2.5rem] p-8 overflow-hidden flex flex-col shadow-2xl`}>
+                                <div className="grid grid-cols-5 text-white font-black text-lg mb-6 px-6 uppercase opacity-80">
+                                    <span>Que Number</span><span className="col-span-1">Name</span><span>Location</span><span>Status</span><span className="text-right">Action</span>
                                 </div>
-                                <div className="flex items-center gap-4">
-                                     <select value={myRoom} onChange={e=>setMyRoom(e.target.value)} className="bg-gray-100 px-4 py-2 rounded font-bold border-2">
-                                            {config.rooms.map(r=><option key={r} value={r}>{r}</option>)}
-                                    </select>
-                                    {renderClock()}
-                                </div>
-                            </div>
-
-                            <div className="flex-1 bg-[#0047AB] rounded-2xl p-6 overflow-hidden flex flex-col shadow-xl">
-                                <div className="grid grid-cols-5 text-white font-bold text-lg mb-4 px-4">
-                                    <span>Que Number</span>
-                                    <span className="col-span-1">Name</span>
-                                    <span>Location</span>
-                                    <span>Status</span>
-                                    <span className="text-right">Action</span>
-                                </div>
-                                <div className="flex-1 overflow-y-auto custom-scroll space-y-2 pr-2">
-                                    {queue.filter(p => p.status === 'waiting' || p.status === 'calling').map(p => (
-                                        <div key={p.id} className="grid grid-cols-5 items-center bg-white/10 p-4 rounded-xl text-white hover:bg-white/20 transition-colors">
-                                            <span className="text-2xl font-black mono-num">{p.num}</span>
-                                            <span className="truncate">{p.name}</span>
-                                            <span className="uppercase text-sm">{p.status === 'calling' ? p.loc : 'Waiting Hall'}</span>
-                                            <span className="uppercase text-xs font-bold bg-black/20 inline-block py-1 px-3 rounded-full w-fit">{p.status}</span>
-                                            <div className="flex justify-end gap-2">
-                                                <button onClick={()=>db.collection("queue").doc(p.id).update({status:'calling', loc:myRoom, callTrigger:Date.now()})} className="bg-white text-[#0047AB] px-4 py-2 rounded-lg font-bold text-sm hover:scale-105 transition-transform">CALL</button>
-                                                <button onClick={()=>db.collection("queue").doc(p.id).update({status:'collecting', loc:'Pharmacy'})} className="bg-green-400 text-green-900 px-4 py-2 rounded-lg font-bold text-sm hover:scale-105 transition-transform">RX</button>
+                                <div className="flex-1 overflow-y-auto custom-scroll space-y-3 pr-2">
+                                    {queue.filter(p => view === 'doctor' ? (p.status === 'waiting' || p.status === 'calling') : p.status === 'collecting').map(p => (
+                                        <div key={p.id} className="grid grid-cols-5 items-center bg-white/10 p-5 rounded-2xl text-white hover:bg-white/20 transition-all">
+                                            <span className="text-3xl font-black mono-num">{p.num}</span>
+                                            <span className="font-bold truncate text-lg uppercase">{p.name}</span>
+                                            <span className="uppercase text-sm font-bold opacity-70">{p.loc}</span>
+                                            <span className="uppercase text-xs font-black bg-black/30 py-1 px-4 rounded-full w-fit">{p.status}</span>
+                                            <div className="flex justify-end gap-3">
+                                                {view === 'doctor' ? (
+                                                    <>
+                                                        <button onClick={()=>db.collection("queue").doc(p.id).update({status:'calling', loc:myRoom, callTrigger:Date.now()})} className="bg-white text-[#0047AB] px-5 py-2 rounded-xl font-black text-sm uppercase hover:scale-105">Call</button>
+                                                        <button onClick={()=>db.collection("queue").doc(p.id).update({status:'collecting', loc:'Pharmacy'})} className="bg-green-400 text-green-900 px-5 py-2 rounded-xl font-black text-sm uppercase hover:scale-105">RX</button>
+                                                    </>
+                                                ) : (
+                                                    <button onClick={()=>db.collection("queue").doc(p.id).update({status:'finished'})} className="bg-white text-[#F28C28] px-8 py-2 rounded-xl font-black text-sm uppercase hover:scale-105">Done</button>
+                                                )}
                                             </div>
                                         </div>
                                     ))}
-                                    {queue.filter(p => p.status === 'waiting' || p.status === 'calling').length === 0 && (
-                                        <div className="text-white/30 text-center mt-20 text-xl font-bold">No patients waiting</div>
-                                    )}
                                 </div>
                             </div>
                         </div>
                     )}
-
-                    {/* === PHARMACY CONSOLE === */}
-                    {view === 'pharmacy' && (
-                        <div className="p-8 h-full flex flex-col">
-                            <div className="flex justify-between items-start mb-6">
-                                <div>
-                                    {renderConsoleNav()}
-                                    <h2 className="text-3xl font-bold text-[#0047AB] uppercase">Pharmacy Console</h2>
-                                </div>
-                                {renderClock()}
-                            </div>
-
-                            <div className="flex-1 bg-[#F28C28] rounded-2xl p-6 overflow-hidden flex flex-col shadow-xl">
-                                <div className="grid grid-cols-5 text-white font-bold text-lg mb-4 px-4">
-                                    <span>Que Number</span>
-                                    <span className="col-span-1">Name</span>
-                                    <span>Location</span>
-                                    <span>Status</span>
-                                    <span className="text-right">Action</span>
-                                </div>
-                                <div className="flex-1 overflow-y-auto custom-scroll space-y-2 pr-2">
-                                    {queue.filter(p => p.status === 'collecting').map(p => (
-                                        <div key={p.id} className="grid grid-cols-5 items-center bg-white/10 p-4 rounded-xl text-white hover:bg-white/20 transition-colors">
-                                            <span className="text-2xl font-black mono-num">{p.num}</span>
-                                            <span className="truncate">{p.name}</span>
-                                            <span className="uppercase text-sm">Pharmacy</span>
-                                            <span className="uppercase text-xs font-bold bg-black/20 inline-block py-1 px-3 rounded-full w-fit">READY</span>
-                                            <div className="flex justify-end gap-2">
-                                                <button onClick={()=>db.collection("queue").doc(p.id).update({status:'finished'})} className="bg-white text-[#F28C28] px-6 py-2 rounded-lg font-bold text-sm hover:scale-105 transition-transform">DONE</button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {queue.filter(p => p.status === 'collecting').length === 0 && (
-                                        <div className="text-white/30 text-center mt-20 text-xl font-bold">No pharmacy collections pending</div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* === REGISTRATION / KIOSK === */}
-                    {view === 'reg' && (
-                        <div className="p-8 h-full flex flex-col items-center">
-                             {/* TABS FOR NAVIGATION */}
-                             <div className="w-full max-w-2xl mb-8">
-                                {renderConsoleNav()}
-                             </div>
-                            
-                            <div className="w-full flex justify-end items-start mb-4 max-w-2xl">
-                                {renderClock()}
-                            </div>
-
-                            <div className="max-w-md w-full bg-white border-2 border-gray-200 p-10 rounded-[2.5rem] shadow-xl text-center">
-                                <h2 className="text-2xl font-black mb-8 uppercase text-gray-800">Issue Ticket</h2>
-                                <input type="number" className="w-full text-center text-6xl font-black mono-num outline-none bg-gray-50 rounded-2xl py-4 mb-4 border-2 border-transparent focus:border-blue-500 transition-all" placeholder="0000" value={inputNum} onChange={e=>setInputNum(e.target.value)} />
-                                <input className="w-full bg-gray-100 p-4 rounded-2xl text-lg font-bold mb-8 text-center" placeholder="Patient Name (Optional)" value={inputName} onChange={e=>setInputName(e.target.value)} />
-                                <button onClick={async () => {
-                                    const n = inputNum || (queue.length ? Math.max(...queue.map(p=>parseInt(p.num)||0))+1 : 1001);
-                                    await db.collection("queue").add({num:n, name:inputName||'Patient', status:'waiting', time:Date.now(), loc:'-'});
-                                    setInputNum(''); setInputName('');
-                                }} className="w-full bg-black text-white p-6 rounded-2xl text-xl font-black uppercase hover:bg-gray-800 transition-colors">
-                                    GET TICKET
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Floating Settings Button (Always visible) */}
-                    <button onClick={() => setShowSettings(true)} className="fixed bottom-6 right-6 bg-gray-900 text-white p-4 rounded-full shadow-lg hover:scale-110 transition-transform z-50">
-                        <i className="ri-settings-4-line text-xl"></i>
-                    </button>
 
                     {/* SETTINGS OVERLAY */}
                     {showSettings && (
                         <div className="fixed inset-0 bg-black/80 z-[999] flex items-center justify-center p-6">
-                            <div className="bg-white p-8 rounded-3xl w-full max-w-lg shadow-2xl">
+                            <div className="bg-white p-8 rounded-[2rem] w-full max-w-lg shadow-2xl">
                                 <div className="flex justify-between items-center mb-6">
-                                    <h2 className="text-xl font-black uppercase">System Settings</h2>
-                                    <button onClick={()=>setShowSettings(false)} className="bg-gray-100 p-2 rounded-full"><i className="ri-close-line text-xl"></i></button>
+                                    <h2 className="text-2xl font-black uppercase tracking-tighter">System Settings</h2>
+                                    <button onClick={()=>setShowSettings(false)} className="bg-gray-100 p-2 rounded-full hover:bg-gray-200"><i className="ri-close-line text-2xl"></i></button>
                                 </div>
-                                <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-                                    <div className="bg-blue-50 p-4 rounded-xl">
-                                        <label className="block text-xs font-black text-blue-500 mb-2 uppercase">Language Mode</label>
+                                <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2 custom-scroll">
+                                    <div className="space-y-2">
+                                        <label className="block text-xs font-black text-gray-400 uppercase">Dual Language (English + Mandarin)</label>
                                         <div className="flex gap-2">
-                                            <button onClick={()=>db.collection("settings").doc("config").update({lang:'en'})} className={`flex-1 py-2 rounded-lg font-bold text-sm ${config.lang==='en'?'bg-blue-600 text-white':'bg-white text-gray-400'}`}>English</button>
-                                            <button onClick={()=>db.collection("settings").doc("config").update({lang:'zh'})} className={`flex-1 py-2 rounded-lg font-bold text-sm ${config.lang==='zh'?'bg-blue-600 text-white':'bg-white text-gray-400'}`}>Mandarin (Dual)</button>
+                                            <button onClick={()=>db.collection("settings").doc("config").update({lang:'en'})} className={`flex-1 py-3 rounded-xl font-bold ${config.lang==='en'?'bg-blue-600 text-white':'bg-gray-100 text-gray-400'}`}>OFF</button>
+                                            <button onClick={()=>db.collection("settings").doc("config").update({lang:'zh'})} className={`flex-1 py-3 rounded-xl font-bold ${config.lang==='zh'?'bg-blue-600 text-white':'bg-gray-100 text-gray-400'}`}>ON</button>
                                         </div>
                                     </div>
-                                    
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Scrolling Ticker</label>
-                                        <input className="w-full bg-gray-100 p-3 rounded-xl font-bold text-sm" value={config.tickerText} onChange={e=>db.collection("settings").doc("config").update({tickerText: e.target.value})} />
+                                    <div className="space-y-2">
+                                        <label className="block text-xs font-black text-gray-400 uppercase">Ticker Text</label>
+                                        <input className="w-full bg-gray-100 p-4 rounded-xl font-bold" value={config.tickerText} onChange={e=>db.collection("settings").doc("config").update({tickerText: e.target.value})} />
                                     </div>
-                                    
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Clinic Name</label>
-                                        <input className="w-full bg-gray-100 p-3 rounded-xl font-bold text-sm" value={config.header} onChange={e=>db.collection("settings").doc("config").update({header: e.target.value})} />
+                                    <div className="space-y-2">
+                                        <label className="block text-xs font-black text-gray-400 uppercase">Clinic Name</label>
+                                        <input className="w-full bg-gray-100 p-4 rounded-xl font-bold" value={config.header} onChange={e=>db.collection("settings").doc("config").update({header: e.target.value})} />
                                     </div>
-                                    
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Consultation Rooms (comma separated)</label>
-                                        <input className="w-full bg-gray-100 p-3 rounded-xl font-bold text-sm" value={config.rooms.join(',')} onChange={e=>db.collection("settings").doc("config").update({rooms: e.target.value.split(',')})} />
+                                    <div className="space-y-2">
+                                        <label className="block text-xs font-black text-gray-400 uppercase">Manage Rooms</label>
+                                        <input className="w-full bg-gray-100 p-4 rounded-xl font-bold" value={config.rooms.join(',')} onChange={e=>db.collection("settings").doc("config").update({rooms: e.target.value.split(',')})} />
                                     </div>
-
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Upload Slideshow</label>
-                                        <input type="file" multiple className="text-sm" onChange={(e)=>{
+                                    <div className="space-y-2">
+                                        <label className="block text-xs font-black text-gray-400 uppercase">Slide Upload</label>
+                                        <input type="file" multiple className="text-sm block" onChange={(e)=>{
                                             const f = Array.from(e.target.files);
                                             Promise.all(f.map(file => new Promise(res => {
                                                 const r = new FileReader(); r.onload = (ev) => res(ev.target.result); r.readAsDataURL(file);
                                             }))).then(setSlides);
                                         }} />
                                     </div>
-
-                                    <button onClick={()=>{ if(confirm('Clear all waiting patients?')) queue.forEach(p=>db.collection("queue").doc(p.id).delete()) }} className="w-full mt-4 bg-red-100 text-red-600 py-3 rounded-xl font-black text-xs uppercase hover:bg-red-200">
-                                        Reset Queue Data
-                                    </button>
+                                    <button onClick={()=>{ if(confirm('Reset all queue data?')) queue.forEach(p=>db.collection("queue").doc(p.id).delete()) }} className="w-full bg-red-50 text-red-500 py-4 rounded-xl font-black text-xs uppercase hover:bg-red-100 transition-colors">Clear All Records</button>
                                 </div>
                             </div>
                         </div>
