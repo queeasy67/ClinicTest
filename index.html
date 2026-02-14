@@ -18,33 +18,49 @@
         :root { --surface: #0047AB; --bg: #ffffff; --orange-panel: #FFBD70; } 
         body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: #000; height: 100vh; overflow: hidden; margin: 0; }
         
-        /* New TV Layout Grid per {CD11AE4C-CB98-4E44-97FE-A05C142659A8}.png */
+        /* Revised TV Layout Grid to match {CD11AE4C-CB98-4E44-97FE-A05C142659A8}.png */
         .tv-grid { 
             display: grid; 
-            grid-template-rows: auto 1fr auto auto; 
+            grid-template-rows: 1fr auto auto; 
             height: 100vh; 
-            padding: 40px; 
+            padding: 30px; 
             box-sizing: border-box; 
-            gap: 30px; 
+            gap: 25px; 
         }
         
-        .main-row { display: grid; grid-template-columns: 1fr 2.2fr; gap: 30px; }
-        .footer-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 25px; }
+        .main-content-area { 
+            display: grid; 
+            grid-template-columns: 420px 1fr; 
+            gap: 30px; 
+            height: 100%;
+        }
+
+        .left-panel {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .header-stack {
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+        }
+
+        .footer-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
         
-        .box-blue { background: var(--surface); color: white; border-radius: 15px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        .box-orange { background: var(--orange-panel); color: white; border-radius: 15px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; height: 180px; }
+        .box-blue { background: var(--surface); color: white; border-radius: 15px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+        .box-orange { background: var(--orange-panel); color: white; border-radius: 15px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; height: 160px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
         
-        .ticker-wrap { display: flex; align-items: center; overflow: hidden; padding-top: 20px; }
+        .ticker-wrap { display: flex; align-items: center; overflow: hidden; height: 50px; }
         .ticker-content { white-space: nowrap; animation: marquee 35s linear infinite; font-weight: 800; font-size: 2rem; color: #000; text-transform: uppercase; }
         @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
 
-        .console-btn { background: #B4B4B4; color: black; font-weight: 800; padding: 8px 20px; border-radius: 8px; text-transform: uppercase; font-size: 0.85rem; }
+        .console-btn { background: #B4B4B4; color: black; font-weight: 800; padding: 8px 18px; border-radius: 8px; text-transform: uppercase; font-size: 0.8rem; }
         .console-btn.active { background: #505050; color: white; }
         
-        .action-select { background: white; color: #0047AB; font-weight: 800; padding: 8px 12px; border-radius: 8px; border: none; cursor: pointer; text-transform: uppercase; font-size: 0.75rem; appearance: none; }
+        .action-select { background: white; color: #0047AB; font-weight: 800; padding: 10px 16px; border-radius: 10px; border: none; cursor: pointer; text-transform: uppercase; font-size: 0.8rem; appearance: none; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         
-        .custom-scroll::-webkit-scrollbar { width: 8px; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }
         .mono-num { font-family: 'JetBrains Mono', monospace; font-weight: 800; }
         .slideshow-img { width: 100%; height: 100%; object-fit: cover; border-radius: 15px; }
     </style>
@@ -53,6 +69,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
+        // Firebase Config
         const FIREBASE_CONFIG = {
             apiKey: "AIzaSyDZ6K02v3Ovwo7xLqL4x33sIQNzv3ydXL8",
             authDomain: "queueasy-ea33b.firebaseapp.com",
@@ -89,7 +106,7 @@
                 return () => unsubQ();
             }, [slides.length]);
 
-            // Announcement Logic
+            // Fix: Voice logic triggers on ANY console call by sorting by callTrigger
             const speakDual = (num, loc) => {
                 window.speechSynthesis.cancel();
                 const uEn = new SpeechSynthesisUtterance(`Number ${num}. Please proceed to ${loc}.`);
@@ -97,15 +114,14 @@
                 window.speechSynthesis.speak(uEn);
 
                 if (config.lang === 'zh') {
-                    const roomNum = loc.replace(/[^0-9]/g, ''); 
-                    const uZh = new SpeechSynthesisUtterance(`请 ${num} 号, 到 ${roomNum} 号房`);
-                    const vs = window.speechSynthesis.getVoices();
-                    const vZh = vs.find(v => v.lang.includes('zh') || v.name.includes('Chinese'));
-                    if (vZh) { uZh.voice = vZh; uZh.rate = 0.9; window.speechSynthesis.speak(uZh); }
+                    const uZh = new SpeechSynthesisUtterance(`请 ${num} 号, 到 ${loc.replace(/[^0-9]/g, '') || '药房'} `);
+                    uZh.rate = 0.9;
+                    window.speechSynthesis.speak(uZh);
                 }
             };
 
-            const currentCaller = queue.find(p => p.status === 'calling');
+            // Fix: Find the MOST RECENTLY called patient across all consoles
+            const currentCaller = queue.filter(p => p.status === 'calling').sort((a,b) => (b.callTrigger || 0) - (a.callTrigger || 0))[0];
             const lastCallRef = React.useRef(0);
 
             React.useEffect(() => {
@@ -116,7 +132,7 @@
                 }
             }, [currentCaller, audioUnlocked, view]);
 
-            const latestHistory = queue.filter(p => p.status === 'calling' || p.status === 'collecting').slice(0, 6).filter(p => p.id !== currentCaller?.id).slice(0, 4);
+            const latestHistory = queue.filter(p => p.status === 'calling' || p.status === 'collecting').slice(0, 8).filter(p => p.id !== currentCaller?.id).slice(0, 4);
 
             const renderHeader = (title) => (
                 <div className="flex justify-between items-start mb-4">
@@ -127,11 +143,11 @@
                             <button onClick={() => setView('pharmacy')} className={`console-btn ${view==='pharmacy'?'active':''}`}>PHARMACY</button>
                             <button onClick={() => setView('tv')} className="console-btn">TV</button>
                         </div>
-                        <h2 className="text-4xl font-black text-[#0047AB] uppercase tracking-tighter">{title}</h2>
+                        <h2 className="text-4xl font-black text-[#0047AB] uppercase">{title}</h2>
                     </div>
                     <div className="flex items-center gap-6">
                         <div className="text-right">
-                            <div className="text-4xl font-bold uppercase leading-none">{new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                            <div className="text-4xl font-bold uppercase">{new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
                             <div className="text-sm font-bold opacity-60 uppercase">{new Date().toLocaleDateString([], {weekday: 'long', day: 'numeric', month: 'long'})}</div>
                         </div>
                         <button onClick={() => setShowSettings(true)} className="text-gray-400 hover:text-black"><i className="ri-settings-4-fill text-3xl"></i></button>
@@ -142,65 +158,61 @@
             return (
                 <div className="h-screen w-screen relative overflow-hidden bg-white">
                     
-                    {/* === TV VIEW (ADOPTED NEW DESIGN) === */}
+                    {/* === TV VIEW (PUSHED UP DESIGN) === */}
                     {view === 'tv' && (
                         <div className="tv-grid">
-                            {/* Header Section per image */}
-                            <div className="flex items-start gap-6">
-                                <div className="text-[#0047AB]">
-                                    <h1 className="text-5xl font-extrabold tracking-tight">{config.header}</h1>
-                                    <div className="font-bold uppercase text-xl leading-tight mt-1 text-black opacity-80">
-                                        {new Date().toLocaleDateString([], {weekday: 'long'})}<br/>
-                                        {new Date().toLocaleDateString([], {day: '2-digit', month: 'long', year: 'numeric'})}<br/>
-                                        {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false})}
+                            <div className="main-content-area">
+                                <div className="left-panel">
+                                    {/* Compact Header */}
+                                    <div className="header-stack">
+                                        <div className="text-[#0047AB]">
+                                            <h1 className="text-4xl font-extrabold tracking-tight leading-none">{config.header}</h1>
+                                            <div className="font-bold uppercase text-lg mt-2 text-black opacity-80 leading-tight">
+                                                {new Date().toLocaleDateString([], {weekday: 'long'})}<br/>
+                                                {new Date().toLocaleDateString([], {day: '2-digit', month: 'long', year: 'numeric'})}<br/>
+                                                {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false})}
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2 mt-1">
+                                            <button onClick={() => setView('reg')} className="text-gray-300 hover:text-black"><i className="ri-home-4-fill text-3xl"></i></button>
+                                            <button onClick={() => setShowSettings(true)} className="text-gray-300 hover:text-black"><i className="ri-settings-4-fill text-3xl"></i></button>
+                                            {!audioUnlocked && (
+                                                <button onClick={() => setAudioUnlocked(true)} className="bg-red-500 text-white px-3 py-1 rounded-full text-[10px] font-black uppercase animate-pulse">Unmute</button>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Calling Box */}
+                                    <div className="box-blue h-[450px] shadow-2xl">
+                                        <div className="text-3xl font-bold mb-2 tracking-[0.2em] uppercase italic opacity-70">Calling</div>
+                                        <div className="text-[180px] leading-none mono-num mb-4">{currentCaller ? currentCaller.num : "##"}</div>
+                                        <div className="text-5xl font-black uppercase tracking-widest">{currentCaller ? currentCaller.loc : "Location"}</div>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-3 mt-1">
-                                    <button onClick={() => setView('reg')} className="text-gray-400 hover:text-black transition-colors">
-                                        <i className="ri-home-4-fill text-4xl"></i>
-                                    </button>
-                                    <button onClick={() => setShowSettings(true)} className="text-gray-400 hover:text-black transition-colors">
-                                        <i className="ri-settings-4-fill text-4xl"></i>
-                                    </button>
-                                    {/* Mute/Unmute Indicator */}
-                                    {!audioUnlocked && (
-                                        <button onClick={() => setAudioUnlocked(true)} className="bg-red-500 text-white px-4 py-2 rounded-full font-black text-xs uppercase animate-pulse">
-                                            <i className="ri-volume-mute-fill mr-1"></i> Tap to Unmute
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
 
-                            {/* Main Row: Calling Box & Slideshow */}
-                            <div className="main-row">
-                                <div className="box-blue p-8 shadow-2xl">
-                                    <div className="text-4xl font-bold mb-4 tracking-[0.2em] uppercase italic opacity-80">Calling</div>
-                                    <div className="text-[160px] leading-none mono-num mb-6 drop-shadow-lg">{currentCaller ? currentCaller.num : "##"}</div>
-                                    <div className="text-5xl font-black uppercase tracking-widest">{currentCaller ? currentCaller.loc : "Location"}</div>
-                                </div>
-                                <div className="box-blue overflow-hidden shadow-2xl">
+                                {/* Slideshow pushed to the top */}
+                                <div className="box-blue overflow-hidden shadow-2xl h-full">
                                     {slides.length > 0 ? (
                                         <img src={slides[slideIndex]} className="slideshow-img" />
                                     ) : (
-                                        <div className="text-4xl font-bold text-white/20 uppercase">Image Slideshow Goes Here</div>
+                                        <div className="text-3xl font-bold text-white/10 uppercase">Clinical Gallery</div>
                                     )}
                                 </div>
                             </div>
 
-                            {/* Footer Row: Recent history boxes */}
+                            {/* Footer Orange Panels */}
                             <div className="footer-row">
                                 {[0,1,2,3].map(i => {
                                     const item = latestHistory[i];
                                     return (
-                                        <div key={i} className="box-orange shadow-lg">
-                                            <div className="text-6xl font-black mono-num mb-1 drop-shadow-sm">{item ? item.num : "##"}</div>
-                                            <div className="text-2xl font-bold uppercase tracking-wider opacity-90">{item ? (item.status === 'collecting' ? 'Pharmacy' : item.loc) : "Location"}</div>
+                                        <div key={i} className="box-orange">
+                                            <div className="text-6xl font-black mono-num mb-1">{item ? item.num : "##"}</div>
+                                            <div className="text-xl font-bold uppercase tracking-wider opacity-80">{item ? (item.status === 'collecting' ? 'Pharmacy' : item.loc) : "Location"}</div>
                                         </div>
                                     );
                                 })}
                             </div>
 
-                            {/* Scrolling Ticker at the very bottom */}
                             <div className="ticker-wrap">
                                 <div className="ticker-content">{config.tickerText}</div>
                             </div>
@@ -216,19 +228,19 @@
                                     <div className="w-full space-y-8">
                                         <div className="text-center">
                                             <label className="block text-white font-bold text-xl mb-3 uppercase">Que Number</label>
-                                            <input type="number" value={inputNum} onChange={e=>setInputNum(e.target.value)} placeholder="####" className="w-full bg-white rounded-2xl py-6 text-center text-4xl font-black mono-num outline-none shadow-inner"/>
+                                            <input type="number" value={inputNum} onChange={e=>setInputNum(e.target.value)} placeholder="####" className="w-full bg-white rounded-2xl py-6 text-center text-4xl font-black mono-num outline-none"/>
                                         </div>
                                         <div className="text-center">
                                             <label className="block text-white font-bold text-xl mb-3 uppercase">Name</label>
-                                            <input type="text" value={inputName} onChange={e=>setInputName(e.target.value)} placeholder="PATIENT NAME" className="w-full bg-white rounded-2xl py-4 text-center text-xl font-bold outline-none uppercase shadow-inner"/>
+                                            <input type="text" value={inputName} onChange={e=>setInputName(e.target.value)} placeholder="PATIENT NAME" className="w-full bg-white rounded-2xl py-4 text-center text-xl font-bold outline-none uppercase"/>
                                         </div>
                                         <div className="space-y-3 pt-4">
                                             <button onClick={() => {
                                                 const n = inputNum || (queue.length ? Math.max(...queue.map(p=>parseInt(p.num)||0))+1 : 1001);
                                                 db.collection("queue").add({num:n, name:inputName||'Patient', status:'waiting', time:Date.now(), loc:'-'});
                                                 setInputNum(''); setInputName('');
-                                            }} className="w-full bg-white text-[#F28C28] py-4 rounded-2xl text-xl font-black uppercase shadow-md hover:scale-[1.02] transition-transform">Add to que</button>
-                                            <button onClick={() => alert('Print feature triggered')} className="w-full bg-white text-[#F28C28] py-4 rounded-2xl text-xl font-black uppercase shadow-md border-t border-black/5 hover:scale-[1.02] transition-transform">Print ticket</button>
+                                            }} className="w-full bg-white text-[#F28C28] py-4 rounded-2xl text-xl font-black uppercase shadow-md">Add to que</button>
+                                            <button onClick={() => alert('Print triggered')} className="w-full bg-white text-[#F28C28] py-4 rounded-2xl text-xl font-black uppercase shadow-md border-t border-black/5">Print ticket</button>
                                         </div>
                                     </div>
                                 </div>
@@ -238,7 +250,7 @@
                                         <div className="grid grid-cols-2 text-black/80 font-black text-xl border-b-2 border-black/10 pb-4 mb-4 px-4 uppercase">
                                             <span>Number</span><span>Location</span>
                                         </div>
-                                        <div className="flex-1 overflow-y-auto custom-scroll pr-4 space-y-3">
+                                        <div className="flex-1 overflow-y-auto pr-4 space-y-3">
                                             {queue.filter(p => p.status !== 'finished').map(p => (
                                                 <div key={p.id} className="grid grid-cols-2 items-center bg-white/40 p-5 rounded-2xl">
                                                     <span className="text-3xl font-black mono-num">{p.num}</span>
@@ -252,7 +264,7 @@
                         </div>
                     )}
 
-                    {/* === DOCTOR/PHARMACY CONSOLES (MAINTAINED) === */}
+                    {/* === DOCTOR/PHARMACY CONSOLES (FIXED CALLING) === */}
                     {(view === 'doctor' || view === 'pharmacy') && (
                         <div className="p-8 h-full flex flex-col">
                             {renderHeader(view === 'doctor' ? "Doctor Console" : "Pharmacy Console")}
@@ -260,7 +272,7 @@
                                 <div className="grid grid-cols-5 text-white font-black text-lg mb-6 px-6 uppercase opacity-80">
                                     <span>Number</span><span>Name</span><span>Location</span><span>Status</span><span className="text-right pr-4">Action</span>
                                 </div>
-                                <div className="flex-1 overflow-y-auto custom-scroll space-y-3 pr-2">
+                                <div className="flex-1 overflow-y-auto space-y-3 pr-2">
                                     {queue.filter(p => view === 'doctor' ? (p.status === 'waiting' || p.status === 'calling') : p.status === 'collecting').map(p => (
                                         <div key={p.id} className="grid grid-cols-5 items-center bg-white/10 p-5 rounded-2xl text-white">
                                             <span className="text-3xl font-black mono-num">{p.num}</span>
@@ -273,18 +285,18 @@
                                                     defaultValue=""
                                                     onChange={(e) => {
                                                         const act = e.target.value;
-                                                        if(act === 'call') db.collection("queue").doc(p.id).update({status:'calling', loc:myRoom, callTrigger:Date.now()});
-                                                        if(act === 'rx') db.collection("queue").doc(p.id).update({status:'collecting', loc:'Pharmacy', callTrigger:Date.now()});
+                                                        // Fix: All call actions now trigger the TV
+                                                        if(act === 'call') db.collection("queue").doc(p.id).update({status:'calling', loc: (view === 'doctor' ? myRoom : 'PHARMACY'), callTrigger:Date.now()});
+                                                        if(act === 'rx') db.collection("queue").doc(p.id).update({status:'collecting', loc:'PHARMACY', callTrigger:Date.now()});
                                                         if(act === 'done') db.collection("queue").doc(p.id).update({status:'finished'});
                                                         if(act === 'del') if(confirm('Remove?')) db.collection("queue").doc(p.id).delete();
                                                         e.target.value = "";
                                                     }}
                                                 >
                                                     <option value="" disabled>--- SELECT ---</option>
-                                                    {view === 'doctor' && <option value="call">Call Patient</option>}
-                                                    {view === 'doctor' && <option value="rx">Send to RX</option>}
-                                                    {view === 'pharmacy' && <option value="call">Call RX</option>}
-                                                    {view === 'pharmacy' && <option value="done">Complete</option>}
+                                                    <option value="call">{view === 'doctor' ? 'Call Patient' : 'Call for Collection'}</option>
+                                                    {view === 'doctor' && <option value="rx">Send to Pharmacy</option>}
+                                                    {view === 'pharmacy' && <option value="done">Dispensed/Done</option>}
                                                     <option value="del">Remove</option>
                                                 </select>
                                             </div>
@@ -303,9 +315,9 @@
                                     <h2 className="text-2xl font-black uppercase">Settings</h2>
                                     <button onClick={()=>setShowSettings(false)} className="bg-gray-100 p-2 rounded-full"><i className="ri-close-line text-2xl"></i></button>
                                 </div>
-                                <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2 custom-scroll">
+                                <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
                                     <div>
-                                        <label className="block text-xs font-black text-gray-400 uppercase mb-2">My Consultation Room</label>
+                                        <label className="block text-xs font-black text-gray-400 uppercase mb-2">My Room (Dr. Console)</label>
                                         <select value={myRoom} onChange={e=>setMyRoom(e.target.value)} className="w-full bg-gray-100 p-4 rounded-xl font-bold">
                                             {config.rooms.map(r=><option key={r} value={r}>{r}</option>)}
                                         </select>
@@ -315,8 +327,8 @@
                                         <input className="w-full bg-gray-100 p-4 rounded-xl font-bold" value={config.header} onChange={e=>db.collection("settings").doc("config").update({header: e.target.value})} />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="block text-xs font-black text-gray-400 uppercase">Ticker Message</label>
-                                        <input className="w-full bg-gray-100 p-4 rounded-xl font-bold" value={config.tickerText} onChange={e=>db.collection("settings").doc("config").update({tickerText: e.target.value})} />
+                                        <label className="block text-xs font-black text-gray-400 uppercase">Consultation Rooms (Comma Separated)</label>
+                                        <input className="w-full bg-gray-100 p-4 rounded-xl font-bold" value={config.rooms.join(',')} onChange={e=>db.collection("settings").doc("config").update({rooms: e.target.value.split(',')})} />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="block text-xs font-black text-gray-400 uppercase">Image Slideshow Upload</label>
