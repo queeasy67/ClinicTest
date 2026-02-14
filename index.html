@@ -15,24 +15,32 @@
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
 
     <style>
-        :root { --accent: #3b82f6; --surface: #0047AB; --bg: #00CED1; } /* Matching the blue/cyan theme */
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: #000; height: 100vh; overflow: hidden; margin: 0; }
+        :root { --accent: #3b82f6; --surface: #0047AB; --bg: #00CED1; } 
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #f8fafc; color: #000; height: 100vh; overflow: hidden; margin: 0; }
         
-        /* Layout Containers */
+        /* TV Layout */
+        .tv-body { background: var(--bg); }
         .tv-container { display: grid; grid-template-rows: 120px 1fr 80px; height: 100vh; padding: 20px; box-sizing: border-box; gap: 20px; }
         .main-content { display: grid; grid-template-columns: 350px 1fr; gap: 20px; }
-        
-        /* Component Styles */
         .box-blue { background: var(--surface); color: white; border-radius: 4px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
         .box-gray { background: #B4B4B4; border-radius: 4px; padding: 15px; }
-        
         .ticker-bar { background: var(--bg); border-top: 2px solid rgba(0,0,0,0.1); display: flex; align-items: center; overflow: hidden; }
         .marquee-content { white-space: nowrap; animation: marquee 25s linear infinite; font-weight: 800; font-size: 2rem; color: #000; }
         @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
 
+        /* Console Styles */
+        .console-btn { background: #A0A0A0; color: black; font-weight: bold; padding: 8px 24px; border-radius: 6px; text-transform: uppercase; transition: 0.2s; }
+        .console-btn:hover { background: #808080; }
+        .console-btn.active { background: #505050; color: white; }
+        
+        /* Custom Scrollbar */
+        .custom-scroll::-webkit-scrollbar { width: 8px; }
+        .custom-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.5); }
+
         .mono-num { font-family: 'JetBrains Mono', monospace; font-weight: 800; }
         .slideshow-img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
-        
         .glass-nav { background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
     </style>
 </head>
@@ -59,14 +67,19 @@
         };
 
         const App = () => {
+            // Views: 'tv', 'reg', 'doctor', 'pharmacy'
             const [view, setView] = React.useState(localStorage.getItem('active_view') || 'tv');
             const [queue, setQueue] = React.useState([]);
             const [slides, setSlides] = React.useState([]);
             const [slideIndex, setSlideIndex] = React.useState(0);
-            const [config, setConfig] = React.useState({ header: 'QUE EASY', tickerText: 'SCROLLING TICKER GOES HERE', rooms: ['Room 1'], lang: 'en' });
+            const [config, setConfig] = React.useState({ header: 'QUE EASY', tickerText: 'Welcome to the clinic.', rooms: ['Room 1'], lang: 'en' });
             const [showSettings, setShowSettings] = React.useState(false);
             const [audioUnlocked, setAudioUnlocked] = React.useState(false);
             const [myRoom, setMyRoom] = React.useState('Room 1');
+            
+            // Registration inputs
+            const [inputNum, setInputNum] = React.useState('');
+            const [inputName, setInputName] = React.useState('');
 
             const T = ({ k, className = "" }) => (
                 <div className={`flex flex-col leading-tight ${className}`}>
@@ -111,30 +124,45 @@
                 }
             }, [currentCaller, audioUnlocked, view]);
 
+            // --- RENDER HELPERS ---
+            const renderClock = () => (
+                <div className="text-right">
+                    <div className="text-4xl font-bold uppercase text-black leading-none">
+                        {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </div>
+                    <div className="text-sm font-bold opacity-60 uppercase text-black">
+                        {new Date().toLocaleDateString([], {weekday: 'long', day: 'numeric', month: 'long'})}
+                    </div>
+                </div>
+            );
+
+            const renderConsoleNav = () => (
+                <div className="flex gap-2">
+                    <button onClick={() => setView('reg')} className={`console-btn ${view==='reg'?'active':''}`}>REG</button>
+                    <button onClick={() => setView('doctor')} className={`console-btn ${view==='doctor'?'active':''}`}>DOCTOR</button>
+                    <button onClick={() => setView('pharmacy')} className={`console-btn ${view==='pharmacy'?'active':''}`}>PHARMACY</button>
+                    <button onClick={() => setView('tv')} className="console-btn">TV</button>
+                </div>
+            );
+
             return (
-                <div className="h-screen w-screen relative">
-                    {view === 'tv' ? (
+                <div className={`h-screen w-screen relative ${view === 'tv' ? 'tv-body' : 'bg-white'}`}>
+                    
+                    {/* === TV VIEW === */}
+                    {view === 'tv' && (
                         <div className="tv-container">
-                            {/* HEADER */}
                             <div className="flex justify-between items-start">
                                 <h1 className="text-6xl font-black italic tracking-tighter">{config.header}</h1>
-                                <div className="text-right">
-                                    <div className="text-4xl font-bold uppercase">
-                                        {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}
-                                    </div>
-                                    <div className="text-xl font-bold opacity-80 uppercase">
-                                        {new Date().toLocaleDateString([], {weekday: 'long', day: 'numeric', month: 'long'})}
-                                    </div>
-                                    <button onClick={() => setAudioUnlocked(!audioUnlocked)} className="text-xs font-black mt-2 underline">
+                                <div>
+                                    {renderClock()}
+                                    <button onClick={() => setAudioUnlocked(!audioUnlocked)} className="text-xs font-black mt-2 underline block text-right">
                                         {audioUnlocked ? "AUDIO ON" : "CLICK TO UNMUTE"}
                                     </button>
                                 </div>
                             </div>
 
-                            {/* MIDDLE SECTION */}
                             <div className="main-content">
                                 <div className="flex flex-col gap-4">
-                                    {/* CALLING BOX */}
                                     <div className="box-blue h-1/2 p-6 text-center">
                                         <div className="text-3xl font-bold mb-2"><T k="calling" /></div>
                                         <div className="text-[100px] leading-none mono-num mb-2">
@@ -144,8 +172,6 @@
                                             {currentCaller ? currentCaller.loc : <T k="location" />}
                                         </div>
                                     </div>
-                                    
-                                    {/* HISTORY BOX */}
                                     <div className="box-gray flex-1">
                                         <div className="flex justify-between border-b-2 border-black/20 pb-2 mb-2 font-bold text-sm">
                                             <T k="number" />
@@ -155,14 +181,12 @@
                                             {queue.filter(p => p.status === 'collecting').slice(0, 5).map(p => (
                                                 <div key={p.id} className="flex justify-between text-2xl font-black italic">
                                                     <span>{p.num}</span>
-                                                    <span>{p.loc}</span>
+                                                    <span>Pharmacy</span>
                                                 </div>
                                             ))}
                                         </div>
                                     </div>
                                 </div>
-
-                                {/* SLIDESHOW BOX */}
                                 <div className="box-blue relative overflow-hidden">
                                     {slides.length > 0 ? (
                                         <img src={slides[slideIndex]} className="slideshow-img" />
@@ -171,62 +195,168 @@
                                     )}
                                 </div>
                             </div>
-
-                            {/* FOOTER TICKER */}
                             <div className="ticker-bar">
                                 <div className="marquee-content uppercase">{config.tickerText}</div>
                             </div>
                         </div>
-                    ) : (
-                        /* RETENTION OF PREVIOUS ADMIN/REGISTRATION VIEWS */
-                        <div className="p-10 bg-white h-full">
-                            <h2 className="text-2xl font-bold mb-4">{view === 'admin' ? "Doctor Dashboard" : "Kiosk"}</h2>
-                            {view === 'admin' && (
-                                <div className="grid grid-cols-4 gap-4">
-                                    {queue.filter(p=>p.status!=='finished').map(p=>(
-                                        <div key={p.id} className="p-4 border-2 rounded-xl text-center">
-                                            <p className="text-4xl font-bold">{p.num}</p>
-                                            <button onClick={()=>db.collection("queue").doc(p.id).update({status:'calling', loc:myRoom, callTrigger:Date.now()})} className="bg-blue-600 text-white w-full mt-2 py-2 rounded">Call</button>
+                    )}
+
+                    {/* === DOCTOR CONSOLE === */}
+                    {view === 'doctor' && (
+                        <div className="p-8 h-full flex flex-col">
+                            <div className="flex justify-between items-start mb-6">
+                                <div>
+                                    {renderConsoleNav()}
+                                    <h2 className="text-3xl font-bold text-[#0047AB] mt-4 uppercase">Doctor Console</h2>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                     <select value={myRoom} onChange={e=>setMyRoom(e.target.value)} className="bg-gray-100 px-4 py-2 rounded font-bold border-2">
+                                            {config.rooms.map(r=><option key={r} value={r}>{r}</option>)}
+                                    </select>
+                                    {renderClock()}
+                                </div>
+                            </div>
+
+                            <div className="flex-1 bg-[#0047AB] rounded-2xl p-6 overflow-hidden flex flex-col shadow-xl">
+                                <div className="grid grid-cols-5 text-white font-bold text-lg mb-4 px-4">
+                                    <span>Que Number</span>
+                                    <span className="col-span-1">Name</span>
+                                    <span>Location</span>
+                                    <span>Status</span>
+                                    <span className="text-right">Action</span>
+                                </div>
+                                <div className="flex-1 overflow-y-auto custom-scroll space-y-2 pr-2">
+                                    {queue.filter(p => p.status === 'waiting' || p.status === 'calling').map(p => (
+                                        <div key={p.id} className="grid grid-cols-5 items-center bg-white/10 p-4 rounded-xl text-white hover:bg-white/20 transition-colors">
+                                            <span className="text-2xl font-black mono-num">{p.num}</span>
+                                            <span className="truncate">{p.name}</span>
+                                            <span className="uppercase text-sm">{p.status === 'calling' ? p.loc : 'Waiting Hall'}</span>
+                                            <span className="uppercase text-xs font-bold bg-black/20 inline-block py-1 px-3 rounded-full w-fit">{p.status}</span>
+                                            <div className="flex justify-end gap-2">
+                                                <button onClick={()=>db.collection("queue").doc(p.id).update({status:'calling', loc:myRoom, callTrigger:Date.now()})} className="bg-white text-[#0047AB] px-4 py-2 rounded-lg font-bold text-sm hover:scale-105 transition-transform">CALL</button>
+                                                <button onClick={()=>db.collection("queue").doc(p.id).update({status:'collecting', loc:'Pharmacy'})} className="bg-green-400 text-green-900 px-4 py-2 rounded-lg font-bold text-sm hover:scale-105 transition-transform">RX</button>
+                                            </div>
                                         </div>
                                     ))}
+                                    {queue.filter(p => p.status === 'waiting' || p.status === 'calling').length === 0 && (
+                                        <div className="text-white/30 text-center mt-20 text-xl font-bold">No patients waiting</div>
+                                    )}
                                 </div>
-                            )}
-                            {view === 'reg' && (
-                                <button onClick={()=>db.collection("queue").add({num: Math.floor(1000 + Math.random() * 9000), status:'waiting', time:Date.now(), loc:'-'})} className="bg-black text-white p-10 text-3xl font-bold rounded-3xl">GET TICKET</button>
-                            )}
+                            </div>
                         </div>
                     )}
 
-                    {/* NAV BAR */}
-                    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 glass-nav px-6 py-3 rounded-full flex gap-4 items-center z-[100]">
-                        {['tv', 'reg', 'admin'].map(v => (
-                            <button key={v} onClick={() => setView(v)} className={`uppercase font-black text-xs ${view === v ? 'text-cyan-400' : 'text-white'}`}>{v}</button>
-                        ))}
-                        <button onClick={() => setShowSettings(true)} className="text-white"><i className="ri-settings-4-line"></i></button>
-                    </div>
+                    {/* === PHARMACY CONSOLE === */}
+                    {view === 'pharmacy' && (
+                        <div className="p-8 h-full flex flex-col">
+                            <div className="flex justify-between items-start mb-6">
+                                <div>
+                                    {renderConsoleNav()}
+                                    <h2 className="text-3xl font-bold text-[#0047AB] mt-4 uppercase">Pharmacy Console</h2>
+                                </div>
+                                {renderClock()}
+                            </div>
+
+                            <div className="flex-1 bg-[#F28C28] rounded-2xl p-6 overflow-hidden flex flex-col shadow-xl">
+                                <div className="grid grid-cols-5 text-white font-bold text-lg mb-4 px-4">
+                                    <span>Que Number</span>
+                                    <span className="col-span-1">Name</span>
+                                    <span>Location</span>
+                                    <span>Status</span>
+                                    <span className="text-right">Action</span>
+                                </div>
+                                <div className="flex-1 overflow-y-auto custom-scroll space-y-2 pr-2">
+                                    {queue.filter(p => p.status === 'collecting').map(p => (
+                                        <div key={p.id} className="grid grid-cols-5 items-center bg-white/10 p-4 rounded-xl text-white hover:bg-white/20 transition-colors">
+                                            <span className="text-2xl font-black mono-num">{p.num}</span>
+                                            <span className="truncate">{p.name}</span>
+                                            <span className="uppercase text-sm">Pharmacy</span>
+                                            <span className="uppercase text-xs font-bold bg-black/20 inline-block py-1 px-3 rounded-full w-fit">READY</span>
+                                            <div className="flex justify-end gap-2">
+                                                <button onClick={()=>db.collection("queue").doc(p.id).update({status:'finished'})} className="bg-white text-[#F28C28] px-6 py-2 rounded-lg font-bold text-sm hover:scale-105 transition-transform">DONE</button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {queue.filter(p => p.status === 'collecting').length === 0 && (
+                                        <div className="text-white/30 text-center mt-20 text-xl font-bold">No pharmacy collections pending</div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* === REGISTRATION / KIOSK === */}
+                    {view === 'reg' && (
+                        <div className="p-8 h-full flex flex-col items-center">
+                            <div className="w-full flex justify-between items-start mb-10">
+                                {renderConsoleNav()}
+                                {renderClock()}
+                            </div>
+                            <div className="max-w-md w-full bg-white border-2 border-gray-200 p-10 rounded-[2.5rem] shadow-xl text-center">
+                                <h2 className="text-2xl font-black mb-8 uppercase text-gray-800">Issue Ticket</h2>
+                                <input type="number" className="w-full text-center text-6xl font-black mono-num outline-none bg-gray-50 rounded-2xl py-4 mb-4 border-2 border-transparent focus:border-blue-500 transition-all" placeholder="0000" value={inputNum} onChange={e=>setInputNum(e.target.value)} />
+                                <input className="w-full bg-gray-100 p-4 rounded-2xl text-lg font-bold mb-8 text-center" placeholder="Patient Name (Optional)" value={inputName} onChange={e=>setInputName(e.target.value)} />
+                                <button onClick={async () => {
+                                    const n = inputNum || (queue.length ? Math.max(...queue.map(p=>parseInt(p.num)||0))+1 : 1001);
+                                    await db.collection("queue").add({num:n, name:inputName||'Patient', status:'waiting', time:Date.now(), loc:'-'});
+                                    setInputNum(''); setInputName('');
+                                }} className="w-full bg-black text-white p-6 rounded-2xl text-xl font-black uppercase hover:bg-gray-800 transition-colors">
+                                    GET TICKET
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Floating Settings Button (Always visible) */}
+                    <button onClick={() => setShowSettings(true)} className="fixed bottom-6 right-6 bg-gray-900 text-white p-4 rounded-full shadow-lg hover:scale-110 transition-transform z-50">
+                        <i className="ri-settings-4-line text-xl"></i>
+                    </button>
 
                     {/* SETTINGS OVERLAY */}
                     {showSettings && (
-                        <div className="fixed inset-0 bg-black/90 z-[999] flex items-center justify-center p-10">
-                            <div className="bg-white p-10 rounded-3xl w-full max-w-lg">
-                                <div className="flex justify-between mb-6"><h2 className="text-2xl font-bold">Settings</h2><button onClick={()=>setShowSettings(false)}>X</button></div>
-                                <div className="space-y-4">
-                                    <label className="block font-bold">Secondary Language</label>
-                                    <div className="flex gap-2">
-                                        <button onClick={()=>db.collection("settings").doc("config").update({lang:'en'})} className={`flex-1 p-2 border ${config.lang==='en'?'bg-blue-500 text-white':''}`}>OFF</button>
-                                        <button onClick={()=>db.collection("settings").doc("config").update({lang:'zh'})} className={`flex-1 p-2 border ${config.lang==='zh'?'bg-blue-500 text-white':''}`}>ON (CN)</button>
+                        <div className="fixed inset-0 bg-black/80 z-[999] flex items-center justify-center p-6">
+                            <div className="bg-white p-8 rounded-3xl w-full max-w-lg shadow-2xl">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-xl font-black uppercase">System Settings</h2>
+                                    <button onClick={()=>setShowSettings(false)} className="bg-gray-100 p-2 rounded-full"><i className="ri-close-line text-xl"></i></button>
+                                </div>
+                                <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+                                    <div className="bg-blue-50 p-4 rounded-xl">
+                                        <label className="block text-xs font-black text-blue-500 mb-2 uppercase">Language Mode</label>
+                                        <div className="flex gap-2">
+                                            <button onClick={()=>db.collection("settings").doc("config").update({lang:'en'})} className={`flex-1 py-2 rounded-lg font-bold text-sm ${config.lang==='en'?'bg-blue-600 text-white':'bg-white text-gray-400'}`}>English</button>
+                                            <button onClick={()=>db.collection("settings").doc("config").update({lang:'zh'})} className={`flex-1 py-2 rounded-lg font-bold text-sm ${config.lang==='zh'?'bg-blue-600 text-white':'bg-white text-gray-400'}`}>Mandarin (Dual)</button>
+                                        </div>
                                     </div>
-                                    <label className="block font-bold">Ticker Text</label>
-                                    <input className="w-full border p-2" value={config.tickerText} onChange={e=>db.collection("settings").doc("config").update({tickerText: e.target.value})} />
-                                    <label className="block font-bold">Clinic Name</label>
-                                    <input className="w-full border p-2" value={config.header} onChange={e=>db.collection("settings").doc("config").update({header: e.target.value})} />
-                                    <label className="block font-bold">Slideshow Upload</label>
-                                    <input type="file" multiple onChange={(e)=>{
-                                        const f = Array.from(e.target.files);
-                                        Promise.all(f.map(file => new Promise(res => {
-                                            const r = new FileReader(); r.onload = (ev) => res(ev.target.result); r.readAsDataURL(file);
-                                        }))).then(setSlides);
-                                    }} />
+                                    
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Scrolling Ticker</label>
+                                        <input className="w-full bg-gray-100 p-3 rounded-xl font-bold text-sm" value={config.tickerText} onChange={e=>db.collection("settings").doc("config").update({tickerText: e.target.value})} />
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Clinic Name</label>
+                                        <input className="w-full bg-gray-100 p-3 rounded-xl font-bold text-sm" value={config.header} onChange={e=>db.collection("settings").doc("config").update({header: e.target.value})} />
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Consultation Rooms (comma separated)</label>
+                                        <input className="w-full bg-gray-100 p-3 rounded-xl font-bold text-sm" value={config.rooms.join(',')} onChange={e=>db.collection("settings").doc("config").update({rooms: e.target.value.split(',')})} />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Upload Slideshow</label>
+                                        <input type="file" multiple className="text-sm" onChange={(e)=>{
+                                            const f = Array.from(e.target.files);
+                                            Promise.all(f.map(file => new Promise(res => {
+                                                const r = new FileReader(); r.onload = (ev) => res(ev.target.result); r.readAsDataURL(file);
+                                            }))).then(setSlides);
+                                        }} />
+                                    </div>
+
+                                    <button onClick={()=>{ if(confirm('Clear all waiting patients?')) queue.forEach(p=>db.collection("queue").doc(p.id).delete()) }} className="w-full mt-4 bg-red-100 text-red-600 py-3 rounded-xl font-black text-xs uppercase hover:bg-red-200">
+                                        Reset Queue Data
+                                    </button>
                                 </div>
                             </div>
                         </div>
