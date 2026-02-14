@@ -18,78 +18,85 @@
         :root { --surface: #0047AB; --bg: #ffffff; --orange-panel: #FFBD70; } 
         body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: #000; height: 100vh; overflow: hidden; margin: 0; }
         
-        /* Layout Grid */
-        .tv-grid { 
+        /* EXACT TV LAYOUT GRID */
+        .tv-container { 
             display: grid; 
-            grid-template-rows: auto 1fr auto auto; 
+            grid-template-rows: auto 1fr auto auto; /* Header, Body, History, Ticker */
             height: 100vh; 
-            padding: 25px; 
+            padding: 40px; 
             box-sizing: border-box; 
-            gap: 20px; 
+            gap: 30px; 
         }
         
-        /* Main Content with Enlarged Left Panel */
-        .main-content-area { 
+        /* Main Body: Calling Panel + 16:9 Slide */
+        .main-display { 
             display: grid; 
-            grid-template-columns: 550px 1fr; /* Increased from 420px */
-            gap: 25px; 
+            grid-template-columns: 0.8fr 1.2fr; /* Enlarged Calling Panel */
+            gap: 30px; 
             min-height: 0; 
         }
 
-        .left-panel { display: flex; flex-direction: column; height: 100%; }
-        .footer-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
-        
-        /* Enlarged Calling Box */
+        /* Elements Styling */
+        .header-left { display: flex; align-items: flex-start; gap: 15px; }
+        .header-right { text-align: right; }
+
         .box-blue { 
             background: var(--surface); 
+            color: white; 
+            border-radius: 24px; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center; 
+            text-align: center;
+            padding: 40px;
+        }
+
+        .history-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+        .box-orange { 
+            background: var(--orange-panel); 
             color: white; 
             border-radius: 20px; 
             display: flex; 
             flex-direction: column; 
             justify-content: center; 
             align-items: center; 
-            text-align: center; 
-            flex: 1;
-            box-shadow: 0 20px 25px -5px rgba(0, 71, 171, 0.2);
+            padding: 20px;
+            height: 160px;
         }
-
-        .box-orange { background: var(--orange-panel); color: white; border-radius: 15px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; height: 140px; }
         
-        /* FIXED 16:9 SLIDESHOW FRAME */
-        .slideshow-container {
+        /* STRICT 16:9 RATIO & FIXED DIMENSION */
+        .slideshow-frame {
             width: 100%;
-            aspect-ratio: 16 / 9; /* Fixed Ratio */
+            aspect-ratio: 16 / 9;
             background: #003580;
-            border-radius: 20px;
+            border-radius: 24px;
             overflow: hidden;
             position: relative;
-            align-self: center; /* Keeps it centered if vertical space varies */
+            align-self: center;
         }
 
         .slideshow-img { 
             position: absolute;
             top: 0; left: 0;
             width: 100%; height: 100%; 
-            object-fit: cover; 
-            transition: opacity 0.5s ease;
+            object-fit: cover; /* Prevents stretching */
         }
 
-        .ticker-wrap { display: flex; align-items: center; overflow: hidden; height: 60px; background: #f8f9fa; border-radius: 10px; }
-        .ticker-content { white-space: nowrap; animation: marquee 35s linear infinite; font-weight: 800; font-size: 2.2rem; color: #000; text-transform: uppercase; }
+        .ticker-bar { overflow: hidden; white-space: nowrap; padding: 15px 0; border-top: 1px solid #eee; }
+        .ticker-text { display: inline-block; animation: marquee 30s linear infinite; font-weight: 800; font-size: 2.5rem; text-transform: uppercase; }
         @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
 
-        .console-btn { background: #B4B4B4; color: black; font-weight: 800; padding: 8px 18px; border-radius: 8px; text-transform: uppercase; font-size: 0.8rem; }
-        .console-btn.active { background: #505050; color: white; }
-        
-        .action-select { background: white; color: #0047AB; font-weight: 800; padding: 10px 16px; border-radius: 10px; border: none; cursor: pointer; text-transform: uppercase; font-size: 0.8rem; appearance: none; }
         .mono-num { font-family: 'JetBrains Mono', monospace; font-weight: 800; }
+        .console-btn { background: #e5e7eb; color: #374151; font-weight: 800; padding: 6px 14px; border-radius: 6px; font-size: 0.75rem; text-transform: uppercase; }
+        .console-btn.active { background: #1f2937; color: white; }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        // Firebase Config and Initialization (Maintained)
+        // Firebase Configuration
         const FIREBASE_CONFIG = {
             apiKey: "AIzaSyDZ6K02v3Ovwo7xLqL4x33sIQNzv3ydXL8",
             authDomain: "queueasy-ea33b.firebaseapp.com",
@@ -109,7 +116,7 @@
             const [slides, setSlides] = React.useState(JSON.parse(localStorage.getItem('qe_slides')) || []);
             const [slideIndex, setSlideIndex] = React.useState(0);
             const [config, setConfig] = React.useState({ 
-                header: 'Clinic Name', 
+                header: 'QueEasy Clinic', 
                 tickerText: 'Welcome to our clinic.', 
                 rooms: ['Room 1'], 
                 lang: 'en',
@@ -121,34 +128,24 @@
             const [inputNum, setInputNum] = React.useState('');
             const [inputName, setInputName] = React.useState('');
 
-            // Data Sync
             React.useEffect(() => {
                 const unsubQ = db.collection("queue").orderBy("time", "desc").onSnapshot(s => setQueue(s.docs.map(d => ({id:d.id, ...d.data()}))));
                 const unsubC = db.collection("settings").doc("config").onSnapshot(doc => doc.exists && setConfig(prev => ({...prev, ...doc.data()})));
                 return () => { unsubQ(); unsubC(); };
             }, []);
 
-            // Slideshow Logic
             React.useEffect(() => {
                 if (slides.length > 1) {
-                    const timer = setInterval(() => {
-                        setSlideIndex(prev => (prev + 1) % slides.length);
-                    }, config.slideSpeed || 5000);
+                    const timer = setInterval(() => setSlideIndex(prev => (prev + 1) % slides.length), config.slideSpeed || 5000);
                     return () => clearInterval(timer);
                 }
             }, [slides.length, config.slideSpeed]);
 
-            // Voice Logic
-            const speakDual = (num, loc) => {
+            const speak = (num, loc) => {
                 window.speechSynthesis.cancel();
-                const uEn = new SpeechSynthesisUtterance(`Number ${num}. Please proceed to ${loc}.`);
-                uEn.rate = 0.9;
-                window.speechSynthesis.speak(uEn);
-                if (config.lang === 'zh') {
-                    const uZh = new SpeechSynthesisUtterance(`请 ${num} 号, 到 ${loc.replace(/[^0-9]/g, '') || '药房'} `);
-                    uZh.rate = 0.9;
-                    window.speechSynthesis.speak(uZh);
-                }
+                const u = new SpeechSynthesisUtterance(`Number ${num}, please proceed to ${loc}`);
+                u.rate = 0.9;
+                window.speechSynthesis.speak(u);
             };
 
             const currentCaller = queue.filter(p => p.status === 'calling').sort((a,b) => (b.callTrigger || 0) - (a.callTrigger || 0))[0];
@@ -157,21 +154,20 @@
             React.useEffect(() => {
                 if(view === 'tv' && currentCaller && audioUnlocked && currentCaller.callTrigger > lastCallRef.current) {
                     lastCallRef.current = currentCaller.callTrigger;
-                    new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play();
-                    setTimeout(() => speakDual(currentCaller.num, currentCaller.loc), 1300);
+                    new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play().then(() => {
+                        setTimeout(() => speak(currentCaller.num, currentCaller.loc), 1200);
+                    });
                 }
             }, [currentCaller, audioUnlocked, view]);
 
-            const latestHistory = queue.filter(p => p.status === 'calling' || p.status === 'collecting').slice(0, 8).filter(p => p.id !== currentCaller?.id).slice(0, 4);
+            const historyItems = queue.filter(p => p.status === 'calling' || p.status === 'collecting').filter(p => p.id !== currentCaller?.id).slice(0, 4);
 
-            // Slideshow Upload/Delete (Maintained)
             const handleFileUpload = (e) => {
                 const files = Array.from(e.target.files);
-                if (slides.length + files.length > 5) { alert("Max 5 pictures."); return; }
                 files.forEach(file => {
                     const reader = new FileReader();
                     reader.onload = (ev) => {
-                        const newSlides = [...slides, ev.target.result];
+                        const newSlides = [...slides, ev.target.result].slice(-5);
                         setSlides(newSlides);
                         localStorage.setItem('qe_slides', JSON.stringify(newSlides));
                     };
@@ -179,194 +175,137 @@
                 });
             };
 
-            const deleteSlide = (idx) => {
-                const newSlides = slides.filter((_, i) => i !== idx);
-                setSlides(newSlides);
-                localStorage.setItem('qe_slides', JSON.stringify(newSlides));
-                setSlideIndex(0);
-            };
-
-            const renderHeader = (title) => (
-                <div className="flex justify-between items-start mb-4">
-                    <div className="flex flex-col gap-4">
-                        <div className="flex gap-2">
-                            {['reg', 'doctor', 'pharmacy', 'tv'].map(v => (
-                                <button key={v} onClick={() => setView(v)} className={`console-btn ${view===v?'active':''}`}>{v}</button>
-                            ))}
-                        </div>
-                        <h2 className="text-4xl font-black text-[#0047AB] uppercase">{title}</h2>
-                    </div>
-                    <div className="flex items-center gap-6">
-                        <div className="text-right">
-                            <div className="text-4xl font-bold uppercase leading-none">{new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
-                            <div className="text-sm font-bold opacity-60 uppercase">{new Date().toLocaleDateString([], {weekday: 'long', day: 'numeric', month: 'long'})}</div>
-                        </div>
-                        <button onClick={() => setShowSettings(true)} className="text-gray-400 hover:text-black"><i className="ri-settings-4-fill text-3xl"></i></button>
-                    </div>
-                </div>
-            );
-
             return (
-                <div className="h-screen w-screen relative overflow-hidden bg-white">
-                    {/* === TV VIEW === */}
-                    {view === 'tv' && (
-                        <div className="tv-grid">
+                <div className="h-screen w-screen overflow-hidden">
+                    {view === 'tv' ? (
+                        <div className="tv-container">
+                            {/* HEADER */}
                             <div className="flex justify-between items-start">
-                                <div>
+                                <div className="header-left">
                                     <h1 className="text-5xl font-extrabold text-[#0047AB] tracking-tight">{config.header}</h1>
-                                    <div className="flex gap-4 font-bold uppercase text-lg mt-1 opacity-60">
-                                        <span>{new Date().toLocaleDateString([], {weekday: 'long', day: '2-digit', month: 'long'})}</span>
-                                        <span>{new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false})}</span>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => setView('reg')}><i className="ri-home-4-fill text-2xl text-gray-300"></i></button>
+                                        <button onClick={() => setShowSettings(true)}><i className="ri-settings-4-fill text-2xl text-gray-300"></i></button>
+                                        {!audioUnlocked && <button onClick={()=>setAudioUnlocked(true)} className="bg-red-500 text-white text-[10px] px-2 rounded animate-pulse">SOUND OFF</button>}
                                     </div>
                                 </div>
-                                <div className="flex gap-3">
-                                    {!audioUnlocked && <button onClick={() => setAudioUnlocked(true)} className="bg-red-500 text-white px-4 py-2 rounded-full text-xs font-black uppercase animate-pulse">Enable Sound</button>}
-                                    <button onClick={() => setShowSettings(true)} className="text-gray-300 hover:text-black"><i className="ri-settings-4-fill text-4xl"></i></button>
+                                <div className="header-right">
+                                    <div className="text-sm font-bold opacity-60 uppercase">{new Date().toLocaleDateString([], {weekday: 'long'})}</div>
+                                    <div className="text-sm font-bold opacity-60 uppercase">{new Date().toLocaleDateString([], {month: 'long', day: '2-digit', year: 'numeric'})}</div>
+                                    <div className="text-4xl font-black mono-num">{new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false})}</div>
                                 </div>
                             </div>
 
-                            <div className="main-content-area">
-                                <div className="left-panel">
-                                    <div className="box-blue">
-                                        <div className="text-4xl font-bold mb-4 tracking-[0.2em] uppercase italic opacity-60">Calling</div>
-                                        {/* Enlarged Number Display */}
-                                        <div className="text-[240px] leading-[0.8] mono-num mb-8">{currentCaller ? currentCaller.num : "##"}</div>
-                                        <div className="text-6xl font-black uppercase tracking-widest bg-white/10 px-8 py-4 rounded-2xl w-full">{currentCaller ? currentCaller.loc : "Location"}</div>
-                                    </div>
+                            {/* MAIN DISPLAY AREA */}
+                            <div className="main-display">
+                                <div className="box-blue shadow-2xl">
+                                    <div className="text-4xl font-bold uppercase italic tracking-[0.3em] opacity-60 mb-4">Calling</div>
+                                    <div className="text-[280px] leading-[0.8] mono-num mb-10">{currentCaller ? currentCaller.num : "##"}</div>
+                                    <div className="text-6xl font-black uppercase tracking-widest">{currentCaller ? currentCaller.loc : "---"}</div>
                                 </div>
 
-                                <div className="slideshow-container shadow-2xl border-4 border-gray-50">
+                                <div className="slideshow-frame shadow-xl">
                                     {slides.length > 0 ? (
                                         <img src={slides[slideIndex]} className="slideshow-img" key={slideIndex} />
                                     ) : (
-                                        <div className="flex h-full items-center justify-center text-white/20 text-4xl font-bold uppercase">Clinical Gallery</div>
+                                        <div className="flex h-full items-center justify-center text-white/10 text-4xl font-bold">SLIDESHOW</div>
                                     )}
                                 </div>
                             </div>
 
-                            <div className="footer-row">
+                            {/* HISTORY PANEL */}
+                            <div className="history-grid">
                                 {[0,1,2,3].map(i => {
-                                    const item = latestHistory[i];
+                                    const item = historyItems[i];
                                     return (
                                         <div key={i} className="box-orange shadow-lg">
-                                            <div className="text-6xl font-black mono-num mb-1">{item ? item.num : "##"}</div>
-                                            <div className="text-lg font-bold uppercase tracking-wider opacity-80">{item ? (item.status === 'collecting' ? 'Pharmacy' : item.loc) : "History"}</div>
+                                            <div className="text-6xl font-black mono-num">{item ? item.num : "##"}</div>
+                                            <div className="text-xl font-bold uppercase opacity-80">{item ? (item.status === 'collecting' ? 'Pharmacy' : item.loc) : "Location"}</div>
                                         </div>
                                     );
                                 })}
                             </div>
-                            <div className="ticker-wrap"><div className="ticker-content">{config.tickerText}</div></div>
-                        </div>
-                    )}
 
-                    {/* === CONSOLES & REG (Maintained) === */}
-                    {(view === 'doctor' || view === 'pharmacy') && (
-                        <div className="p-8 h-full flex flex-col">
-                            {renderHeader(view.toUpperCase() + " CONSOLE")}
-                            <div className={`flex-1 ${view === 'doctor' ? 'bg-[#0047AB]' : 'bg-[#F28C28]'} rounded-[2.5rem] p-8 overflow-hidden flex flex-col shadow-2xl`}>
-                                <div className="grid grid-cols-5 text-white font-black text-lg mb-6 px-6 uppercase opacity-80">
-                                    <span>Number</span><span>Name</span><span>Location</span><span>Status</span><span className="text-right">Action</span>
-                                </div>
-                                <div className="flex-1 overflow-y-auto space-y-3 pr-2">
-                                    {queue.filter(p => view === 'doctor' ? (p.status === 'waiting' || p.status === 'calling') : p.status === 'collecting').map(p => (
-                                        <div key={p.id} className="grid grid-cols-5 items-center bg-white/10 p-5 rounded-2xl text-white">
-                                            <span className="text-3xl font-black mono-num">{p.num}</span>
-                                            <span className="font-bold truncate text-lg uppercase">{p.name}</span>
-                                            <span className="uppercase text-sm font-bold opacity-70">{p.loc}</span>
-                                            <span className="uppercase text-xs font-black bg-black/30 py-1 px-4 rounded-full w-fit">{p.status}</span>
-                                            <div className="flex justify-end">
-                                                <select className="action-select outline-none" defaultValue="" onChange={(e) => {
-                                                    const act = e.target.value;
-                                                    if(act === 'call') db.collection("queue").doc(p.id).update({status:'calling', loc: (view === 'doctor' ? myRoom : 'PHARMACY'), callTrigger:Date.now()});
-                                                    if(act === 'rx') db.collection("queue").doc(p.id).update({status:'collecting', loc:'PHARMACY', callTrigger:Date.now()});
-                                                    if(act === 'done') db.collection("queue").doc(p.id).update({status:'finished'});
-                                                    if(act === 'del') if(confirm('Remove?')) db.collection("queue").doc(p.id).delete();
-                                                    e.target.value = "";
-                                                }}>
-                                                    <option value="" disabled>SELECT ACTION</option>
-                                                    <option value="call">Call Patient</option>
-                                                    {view === 'doctor' && <option value="rx">To Pharmacy</option>}
-                                                    {view === 'pharmacy' && <option value="done">Complete</option>}
-                                                    <option value="del">Remove</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
+                            {/* TICKER */}
+                            <div className="ticker-bar">
+                                <div className="ticker-text">{config.tickerText}</div>
                             </div>
                         </div>
-                    )}
-
-                    {view === 'reg' && (
-                        <div className="p-8 h-full flex flex-col">
-                            {renderHeader("HOME / REGISTRATION")}
-                            <div className="flex-1 grid grid-cols-12 gap-8 overflow-hidden">
-                                <div className="col-span-4 bg-[#F28C28] rounded-[2rem] p-10 flex flex-col items-center shadow-lg">
-                                    <div className="w-full space-y-8">
-                                        <div className="text-center">
-                                            <label className="block text-white font-bold text-xl mb-3 uppercase">Que Number</label>
-                                            <input type="number" value={inputNum} onChange={e=>setInputNum(e.target.value)} placeholder="####" className="w-full bg-white rounded-2xl py-6 text-center text-4xl font-black mono-num outline-none"/>
-                                        </div>
-                                        <div className="text-center">
-                                            <label className="block text-white font-bold text-xl mb-3 uppercase">Name</label>
-                                            <input type="text" value={inputName} onChange={e=>setInputName(e.target.value)} placeholder="PATIENT NAME" className="w-full bg-white rounded-2xl py-4 text-center text-xl font-bold outline-none uppercase"/>
-                                        </div>
-                                        <button onClick={() => {
+                    ) : (
+                        /* CONSOLES / REG (Maintained Layout) */
+                        <div className="p-10 h-full flex flex-col">
+                            <div className="flex justify-between mb-8">
+                                <div className="flex gap-2">
+                                    {['reg', 'doctor', 'pharmacy', 'tv'].map(v => (
+                                        <button key={v} onClick={() => setView(v)} className={`console-btn ${view===v?'active':''}`}>{v}</button>
+                                    ))}
+                                </div>
+                                <h2 className="text-3xl font-black uppercase">{view} Console</h2>
+                            </div>
+                            
+                            {view === 'reg' ? (
+                                <div className="grid grid-cols-2 gap-10 flex-1">
+                                    <div className="bg-[#F28C28] p-10 rounded-[2rem] text-center">
+                                        <input type="number" value={inputNum} onChange={e=>setInputNum(e.target.value)} placeholder="NO" className="w-full p-6 text-4xl font-black rounded-2xl mb-6 text-center"/>
+                                        <input type="text" value={inputName} onChange={e=>setInputName(e.target.value)} placeholder="NAME" className="w-full p-4 text-xl font-bold rounded-2xl mb-6 text-center uppercase"/>
+                                        <button onClick={()=>{
                                             const n = inputNum || (queue.length ? Math.max(...queue.map(p=>parseInt(p.num)||0))+1 : 1001);
                                             db.collection("queue").add({num:n, name:inputName||'Patient', status:'waiting', time:Date.now(), loc:'-'});
                                             setInputNum(''); setInputName('');
-                                        }} className="w-full bg-white text-[#F28C28] py-4 rounded-2xl text-xl font-black uppercase">Add to que</button>
+                                        }} className="w-full bg-white text-[#F28C28] py-4 rounded-2xl font-black uppercase">Add to que</button>
                                     </div>
-                                </div>
-                                <div className="col-span-8 flex flex-col overflow-hidden bg-[#FFD580] rounded-[2rem] p-8">
-                                    <h3 className="text-2xl font-black mb-4 uppercase">Live Registry</h3>
-                                    <div className="flex-1 overflow-y-auto space-y-3">
-                                        {queue.filter(p => p.status !== 'finished').map(p => (
-                                            <div key={p.id} className="grid grid-cols-2 bg-white/40 p-5 rounded-2xl">
-                                                <span className="text-3xl font-black mono-num">{p.num}</span>
-                                                <span className="text-xl font-bold uppercase text-black/60">{p.status}</span>
+                                    <div className="bg-[#FFD580] p-10 rounded-[2rem] overflow-y-auto">
+                                        {queue.filter(p=>p.status!=='finished').map(p=>(
+                                            <div key={p.id} className="flex justify-between bg-white/50 p-4 rounded-xl mb-3">
+                                                <span className="text-2xl font-black">{p.num}</span>
+                                                <span className="font-bold opacity-50 uppercase">{p.status}</span>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
-                            </div>
+                            ) : (
+                                <div className={`flex-1 ${view==='doctor'?'bg-[#0047AB]':'bg-[#F28C28]'} rounded-[2.5rem] p-8 overflow-y-auto`}>
+                                    {queue.filter(p => view === 'doctor' ? (p.status === 'waiting' || p.status === 'calling') : p.status === 'collecting').map(p => (
+                                        <div key={p.id} className="flex items-center justify-between bg-white/10 p-6 rounded-2xl mb-4 text-white">
+                                            <span className="text-4xl font-black mono-num">{p.num}</span>
+                                            <span className="text-xl font-bold uppercase">{p.name}</span>
+                                            <select className="bg-white text-black p-2 rounded font-bold text-xs" defaultValue="" onChange={(e) => {
+                                                const act = e.target.value;
+                                                if(act === 'call') db.collection("queue").doc(p.id).update({status:'calling', loc: (view === 'doctor' ? myRoom : 'PHARMACY'), callTrigger:Date.now()});
+                                                if(act === 'rx') db.collection("queue").doc(p.id).update({status:'collecting', loc:'PHARMACY', callTrigger:Date.now()});
+                                                if(act === 'done') db.collection("queue").doc(p.id).update({status:'finished'});
+                                                e.target.value = "";
+                                            }}>
+                                                <option value="" disabled>ACTION</option>
+                                                <option value="call">Call Now</option>
+                                                {view === 'doctor' && <option value="rx">To Pharmacy</option>}
+                                                <option value="done">Remove</option>
+                                            </select>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
 
-                    {/* === SETTINGS (Maintained) === */}
+                    {/* SETTINGS OVERLAY */}
                     {showSettings && (
-                        <div className="fixed inset-0 bg-black/80 z-[999] flex items-center justify-center p-6">
-                            <div className="bg-white p-8 rounded-[2rem] w-full max-w-2xl">
-                                <div className="flex justify-between items-center mb-6">
-                                    <h2 className="text-2xl font-black uppercase">System Refinement</h2>
-                                    <button onClick={()=>setShowSettings(false)} className="bg-gray-100 p-2 rounded-full"><i className="ri-close-line text-2xl"></i></button>
+                        <div className="fixed inset-0 bg-black/90 z-[999] flex items-center justify-center p-6">
+                            <div className="bg-white p-8 rounded-[2rem] w-full max-w-xl">
+                                <div className="flex justify-between mb-6">
+                                    <h3 className="text-xl font-black uppercase">Settings</h3>
+                                    <button onClick={()=>setShowSettings(false)}><i className="ri-close-line text-2xl"></i></button>
                                 </div>
-                                <div className="grid grid-cols-2 gap-8 max-h-[70vh] overflow-y-auto">
-                                    <div className="space-y-6">
-                                        <h3 className="font-black text-blue-600 uppercase text-xs border-b pb-1">Slideshow Control</h3>
-                                        <select value={config.slideSpeed} onChange={e=>db.collection("settings").doc("config").update({slideSpeed: parseInt(e.target.value)})} className="w-full bg-gray-100 p-4 rounded-xl font-bold">
-                                            <option value={3000}>3 Seconds</option>
-                                            <option value={5000}>5 Seconds</option>
-                                            <option value={10000}>10 Seconds</option>
-                                        </select>
-                                        <div>
-                                            <input type="file" multiple accept="image/*" onChange={handleFileUpload} className="text-xs mb-4" />
-                                            <div className="grid grid-cols-5 gap-2">
-                                                {slides.map((s, i) => (
-                                                    <div key={i} className="relative group aspect-square rounded bg-gray-100 overflow-hidden">
-                                                        <img src={s} className="w-full h-full object-cover" />
-                                                        <button onClick={()=>deleteSlide(i)} className="absolute inset-0 bg-red-500/80 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"><i className="ri-delete-bin-line text-xl"></i></button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase text-gray-400">Clinic Name</label>
+                                        <input className="w-full bg-gray-100 p-3 rounded-lg font-bold" value={config.header} onChange={e=>db.collection("settings").doc("config").update({header: e.target.value})} />
                                     </div>
-                                    <div className="space-y-4">
-                                        <h3 className="font-black text-blue-600 uppercase text-xs border-b pb-1">Clinic Info</h3>
-                                        <input className="w-full bg-gray-100 p-4 rounded-xl font-bold" value={config.header} onChange={e=>db.collection("settings").doc("config").update({header: e.target.value})} />
-                                        <input className="w-full bg-gray-100 p-4 rounded-xl font-bold" value={config.tickerText} onChange={e=>db.collection("settings").doc("config").update({tickerText: e.target.value})} />
-                                        <button onClick={()=>{ if(confirm('Wipe queue?')) queue.forEach(p=>db.collection("queue").doc(p.id).delete()) }} className="w-full bg-red-50 text-red-500 py-4 rounded-xl font-black uppercase text-[10px]">Reset System</button>
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase text-gray-400">Slideshow Upload</label>
+                                        <input type="file" multiple accept="image/*" onChange={handleFileUpload} className="block w-full text-xs" />
                                     </div>
+                                    <button onClick={()=>{ if(confirm('Clear all?')) queue.forEach(p=>db.collection("queue").doc(p.id).delete()) }} className="w-full bg-red-100 text-red-600 py-3 rounded-xl font-black text-xs uppercase">Reset System</button>
                                 </div>
                             </div>
                         </div>
