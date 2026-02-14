@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>QueEasy Pro | TV Display Design</title>
+    <title>QueEasy Pro | Professional Clinic System</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
@@ -18,22 +18,14 @@
         :root { --surface: #0047AB; --bg: #ffffff; --orange-panel: #FFBD70; } 
         body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: #000; height: 100vh; overflow: hidden; margin: 0; }
         
-        /* New TV Layout */
-        .tv-grid { 
-            display: grid; 
-            grid-template-rows: 140px 1fr 180px 60px; 
-            height: 100vh; 
-            padding: 30px; 
-            box-sizing: border-box; 
-            gap: 20px; 
-        }
-        .main-row { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; }
+        /* TV Layout Grid */
+        .tv-grid { display: grid; grid-template-rows: 140px 1fr 180px 60px; height: 100vh; padding: 30px; box-sizing: border-box; gap: 20px; }
+        .main-row { display: grid; grid-template-columns: 1fr 2.2fr; gap: 20px; }
         .footer-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
         
         .box-blue { background: var(--surface); color: white; border-radius: 12px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
         .box-orange { background: var(--orange-panel); color: white; border-radius: 12px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
         
-        /* Ticker Styling */
         .ticker-wrap { background: white; display: flex; align-items: center; overflow: hidden; border-top: 2px solid #eee; }
         .ticker-content { white-space: nowrap; animation: marquee 30s linear infinite; font-weight: 800; font-size: 1.8rem; color: #000; }
         @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
@@ -41,9 +33,10 @@
         .console-btn { background: #B4B4B4; color: black; font-weight: 800; padding: 8px 20px; border-radius: 8px; text-transform: uppercase; font-size: 0.85rem; }
         .console-btn.active { background: #505050; color: white; }
         
+        .action-select { background: white; color: #0047AB; font-weight: 800; padding: 8px 12px; border-radius: 8px; border: none; cursor: pointer; text-transform: uppercase; font-size: 0.75rem; appearance: none; }
+        
         .custom-scroll::-webkit-scrollbar { width: 8px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }
-
         .mono-num { font-family: 'JetBrains Mono', monospace; font-weight: 800; }
         .slideshow-img { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
     </style>
@@ -52,7 +45,6 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        // Firebase Configuration
         const FIREBASE_CONFIG = {
             apiKey: "AIzaSyDZ6K02v3Ovwo7xLqL4x33sIQNzv3ydXL8",
             authDomain: "queueasy-ea33b.firebaseapp.com",
@@ -66,12 +58,17 @@
         if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
         const db = firebase.firestore();
 
+        const i18n = {
+            en: { calling: "CALLING", location: "LOCATION", rx: "PHARMACY" },
+            zh: { calling: "正在呼叫", location: "诊室" }
+        };
+
         const App = () => {
             const [view, setView] = React.useState(localStorage.getItem('active_view') || 'tv');
             const [queue, setQueue] = React.useState([]);
             const [slides, setSlides] = React.useState([]);
             const [slideIndex, setSlideIndex] = React.useState(0);
-            const [config, setConfig] = React.useState({ header: 'Clinic Name', tickerText: 'SCROLLING TICKER GOES HERE', rooms: ['Room 1'], lang: 'en' });
+            const [config, setConfig] = React.useState({ header: 'Clinic Name', tickerText: 'Welcome to our clinic.', rooms: ['Room 1'], lang: 'en' });
             const [showSettings, setShowSettings] = React.useState(false);
             const [audioUnlocked, setAudioUnlocked] = React.useState(false);
             const [myRoom, setMyRoom] = React.useState('Room 1');
@@ -89,8 +86,41 @@
                 return () => unsubQ();
             }, [slides.length]);
 
+            // --- VOICE ANNOUNCEMENT LOGIC ---
+            const speakDual = (num, loc) => {
+                window.speechSynthesis.cancel();
+                const uEn = new SpeechSynthesisUtterance(`Number ${num}. Please proceed to ${loc}.`);
+                uEn.rate = 0.9;
+                window.speechSynthesis.speak(uEn);
+
+                if (config.lang === 'zh') {
+                    const roomNum = loc.replace(/[^0-9]/g, ''); 
+                    const uZh = new SpeechSynthesisUtterance(`请 ${num} 号, 到 ${roomNum} 号房`);
+                    const vs = window.speechSynthesis.getVoices();
+                    const vZh = vs.find(v => v.lang.includes('zh') || v.name.includes('Chinese'));
+                    if (vZh) { uZh.voice = vZh; uZh.rate = 0.9; window.speechSynthesis.speak(uZh); }
+                }
+            };
+
             const currentCaller = queue.find(p => p.status === 'calling');
+            const lastCallRef = React.useRef(0);
+
+            React.useEffect(() => {
+                if(view === 'tv' && currentCaller && audioUnlocked && currentCaller.callTrigger > lastCallRef.current) {
+                    lastCallRef.current = currentCaller.callTrigger;
+                    new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play();
+                    setTimeout(() => speakDual(currentCaller.num, currentCaller.loc), 1300);
+                }
+            }, [currentCaller, audioUnlocked, view]);
+
             const latestHistory = queue.filter(p => p.status === 'calling' || p.status === 'collecting').slice(0, 5).filter(p => p.id !== currentCaller?.id).slice(0, 4);
+
+            const addTicket = async (shouldPrint = false) => {
+                const n = inputNum || (queue.length ? Math.max(...queue.map(p=>parseInt(p.num)||0))+1 : 1001);
+                await db.collection("queue").add({num:n, name:inputName||'Patient', status:'waiting', time:Date.now(), loc:'-'});
+                if(shouldPrint) alert(`Printing Ticket: #${n}`);
+                setInputNum(''); setInputName('');
+            };
 
             const renderHeader = (title) => (
                 <div className="flex justify-between items-start mb-4">
@@ -116,74 +146,57 @@
             return (
                 <div className="h-screen w-screen relative overflow-hidden bg-white">
                     
-                    {/* === NEW TV VIEW === */}
+                    {/* === TV VIEW === */}
                     {view === 'tv' && (
                         <div className="tv-grid">
-                            {/* Header Section */}
                             <div className="flex justify-between items-start">
                                 <div className="flex items-start gap-4">
                                     <div className="text-[#0047AB]">
                                         <h1 className="text-4xl font-extrabold">{config.header}</h1>
-                                        <div className="font-bold uppercase text-lg leading-tight mt-1">
+                                        <div className="font-bold uppercase text-lg leading-tight mt-1 text-black">
                                             {new Date().toLocaleDateString([], {weekday: 'long'})}<br/>
                                             {new Date().toLocaleDateString([], {day: '2-digit', month: 'long', year: 'numeric'})}<br/>
                                             {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false})}
                                         </div>
                                     </div>
-                                    <button onClick={() => setView('reg')} className="text-gray-400 hover:text-black mt-1">
-                                        <i className="ri-home-4-fill text-4xl"></i>
-                                    </button>
+                                    <button onClick={() => setView('reg')} className="text-gray-300 hover:text-black mt-1"><i className="ri-home-4-fill text-4xl"></i></button>
                                 </div>
-                                <button onClick={() => setShowSettings(true)} className="text-gray-300 hover:text-black">
-                                    <i className="ri-settings-4-fill text-3xl"></i>
-                                </button>
+                                <div className="flex items-center gap-4">
+                                    <button onClick={() => setAudioUnlocked(!audioUnlocked)} className={`px-4 py-2 rounded-full font-black text-xs uppercase ${audioUnlocked ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                                        {audioUnlocked ? <><i className="ri-volume-up-fill mr-1"></i> Audio On</> : <><i className="ri-volume-mute-fill mr-1"></i> Click to Unmute</>}
+                                    </button>
+                                    <button onClick={() => setShowSettings(true)} className="text-gray-300 hover:text-black"><i className="ri-settings-4-fill text-3xl"></i></button>
+                                </div>
                             </div>
 
-                            {/* Main Content: Calling & Slideshow */}
                             <div className="main-row">
                                 <div className="box-blue p-8 shadow-xl">
-                                    <div className="text-3xl font-bold mb-4 tracking-widest uppercase">Calling</div>
-                                    <div className="text-[140px] leading-none mono-num mb-6">
-                                        {currentCaller ? currentCaller.num : "##"}
-                                    </div>
-                                    <div className="text-4xl font-black uppercase tracking-widest">
-                                        {currentCaller ? currentCaller.loc : "Location"}
-                                    </div>
+                                    <div className="text-3xl font-bold mb-4 tracking-widest uppercase italic">Calling</div>
+                                    <div className="text-[140px] leading-none mono-num mb-6">{currentCaller ? currentCaller.num : "##"}</div>
+                                    <div className="text-4xl font-black uppercase tracking-widest">{currentCaller ? currentCaller.loc : "Location"}</div>
                                 </div>
                                 <div className="box-blue overflow-hidden shadow-xl">
-                                    {slides.length > 0 ? (
-                                        <img src={slides[slideIndex]} className="slideshow-img" />
-                                    ) : (
-                                        <div className="text-4xl font-bold text-white/20 uppercase">Image Slideshow Goes Here</div>
-                                    )}
+                                    {slides.length > 0 ? <img src={slides[slideIndex]} className="slideshow-img" /> : <div className="text-4xl font-bold text-white/20 uppercase">No Slides Uploaded</div>}
                                 </div>
                             </div>
 
-                            {/* Footer Row: Latest 4 */}
                             <div className="footer-row">
                                 {[0,1,2,3].map(i => {
                                     const item = latestHistory[i];
                                     return (
                                         <div key={i} className="box-orange shadow-lg">
-                                            <div className="text-5xl font-black mono-num mb-1">
-                                                {item ? item.num : "##"}
-                                            </div>
-                                            <div className="text-xl font-bold uppercase tracking-wider">
-                                                {item ? item.loc : "Location"}
-                                            </div>
+                                            <div className="text-5xl font-black mono-num mb-1">{item ? item.num : "##"}</div>
+                                            <div className="text-xl font-bold uppercase tracking-wider">{item ? (item.status === 'collecting' ? 'Pharmacy' : item.loc) : "Location"}</div>
                                         </div>
                                     );
                                 })}
                             </div>
 
-                            {/* Scrolling Ticker */}
-                            <div className="ticker-wrap">
-                                <div className="ticker-content uppercase">{config.tickerText}</div>
-                            </div>
+                            <div className="ticker-wrap"><div className="ticker-content uppercase">{config.tickerText}</div></div>
                         </div>
                     )}
 
-                    {/* === REGISTRATION VIEW === */}
+                    {/* === REGISTRATION VIEW (RESTORED PRINT BUTTON) === */}
                     {view === 'reg' && (
                         <div className="p-8 h-full flex flex-col">
                             {renderHeader("HOME")}
@@ -191,24 +204,21 @@
                                 <div className="col-span-4 bg-[#F28C28] rounded-[2rem] p-10 flex flex-col items-center shadow-lg">
                                     <div className="w-full space-y-8">
                                         <div className="text-center">
-                                            <label className="block text-white font-bold text-xl mb-3">Que Number</label>
+                                            <label className="block text-white font-bold text-xl mb-3 uppercase">Que Number</label>
                                             <input type="number" value={inputNum} onChange={e=>setInputNum(e.target.value)} placeholder="####" className="w-full bg-white rounded-2xl py-6 text-center text-4xl font-black mono-num outline-none shadow-inner"/>
                                         </div>
                                         <div className="text-center">
-                                            <label className="block text-white font-bold text-xl mb-3">Name</label>
+                                            <label className="block text-white font-bold text-xl mb-3 uppercase">Name</label>
                                             <input type="text" value={inputName} onChange={e=>setInputName(e.target.value)} placeholder="PATIENT NAME" className="w-full bg-white rounded-2xl py-4 text-center text-xl font-bold outline-none uppercase shadow-inner"/>
                                         </div>
                                         <div className="space-y-3 pt-4">
-                                            <button onClick={async () => {
-                                                const n = inputNum || (queue.length ? Math.max(...queue.map(p=>parseInt(p.num)||0))+1 : 1001);
-                                                await db.collection("queue").add({num:n, name:inputName||'Patient', status:'waiting', time:Date.now(), loc:'-'});
-                                                setInputNum(''); setInputName('');
-                                            }} className="w-full bg-white text-[#F28C28] py-4 rounded-2xl text-xl font-black uppercase shadow-md">Add to que</button>
+                                            <button onClick={() => addTicket(false)} className="w-full bg-white text-[#F28C28] py-4 rounded-2xl text-xl font-black uppercase shadow-md hover:scale-[1.02] transition-transform">Add to que</button>
+                                            <button onClick={() => addTicket(true)} className="w-full bg-white text-[#F28C28] py-4 rounded-2xl text-xl font-black uppercase shadow-md border-t border-black/5 hover:scale-[1.02] transition-transform">Print ticket</button>
                                         </div>
                                     </div>
                                 </div>
                                 <div className="col-span-8 flex flex-col overflow-hidden">
-                                    <h3 className="text-3xl font-black text-gray-400 mb-4 ml-4 uppercase">Live Que</h3>
+                                    <h3 className="text-3xl font-black text-gray-300 mb-4 ml-4 uppercase">Live Que</h3>
                                     <div className="flex-1 bg-[#FFD580] rounded-[2rem] p-8 flex flex-col shadow-inner overflow-hidden">
                                         <div className="grid grid-cols-2 text-black/80 font-black text-xl border-b-2 border-black/10 pb-4 mb-4 px-4 uppercase">
                                             <span>Number</span><span>Location</span>
@@ -227,28 +237,42 @@
                         </div>
                     )}
 
-                    {/* === DOCTOR/PHARMACY CONSOLES === */}
+                    {/* === DOCTOR/PHARMACY CONSOLES (DROPDOWN ACTIONS) === */}
                     {(view === 'doctor' || view === 'pharmacy') && (
                         <div className="p-8 h-full flex flex-col">
                             {renderHeader(view === 'doctor' ? "Doctor Console" : "Pharmacy Console")}
                             <div className={`flex-1 ${view === 'doctor' ? 'bg-[#0047AB]' : 'bg-[#F28C28]'} rounded-[2.5rem] p-8 overflow-hidden flex flex-col shadow-2xl`}>
                                 <div className="grid grid-cols-5 text-white font-black text-lg mb-6 px-6 uppercase opacity-80">
-                                    <span>Que Number</span><span>Name</span><span>Location</span><span>Status</span><span className="text-right">Action</span>
+                                    <span>Number</span><span>Name</span><span>Location</span><span>Status</span><span className="text-right pr-4">Action</span>
                                 </div>
                                 <div className="flex-1 overflow-y-auto custom-scroll space-y-3 pr-2">
                                     {queue.filter(p => view === 'doctor' ? (p.status === 'waiting' || p.status === 'calling') : p.status === 'collecting').map(p => (
-                                        <div key={p.id} className="grid grid-cols-5 items-center bg-white/10 p-5 rounded-2xl text-white">
+                                        <div key={p.id} className="grid grid-cols-5 items-center bg-white/10 p-5 rounded-2xl text-white hover:bg-white/20 transition-all">
                                             <span className="text-3xl font-black mono-num">{p.num}</span>
                                             <span className="font-bold truncate text-lg uppercase">{p.name}</span>
                                             <span className="uppercase text-sm font-bold opacity-70">{p.loc}</span>
                                             <span className="uppercase text-xs font-black bg-black/30 py-1 px-4 rounded-full w-fit">{p.status}</span>
-                                            <div className="flex justify-end gap-3">
-                                                {view === 'doctor' ? (
-                                                    <><button onClick={()=>db.collection("queue").doc(p.id).update({status:'calling', loc:myRoom, callTrigger:Date.now()})} className="bg-white text-[#0047AB] px-5 py-2 rounded-xl font-black text-sm uppercase">Call</button>
-                                                      <button onClick={()=>db.collection("queue").doc(p.id).update({status:'collecting', loc:'Pharmacy'})} className="bg-green-400 text-green-900 px-5 py-2 rounded-xl font-black text-sm uppercase">RX</button></>
-                                                ) : (
-                                                    <button onClick={()=>db.collection("queue").doc(p.id).update({status:'finished'})} className="bg-white text-[#F28C28] px-8 py-2 rounded-xl font-black text-sm uppercase">Done</button>
-                                                )}
+                                            <div className="flex justify-end relative pr-4">
+                                                <select 
+                                                    className="action-select outline-none" 
+                                                    defaultValue=""
+                                                    onChange={(e) => {
+                                                        const act = e.target.value;
+                                                        if(act === 'call') db.collection("queue").doc(p.id).update({status:'calling', loc:myRoom, callTrigger:Date.now()});
+                                                        if(act === 'rx') db.collection("queue").doc(p.id).update({status:'collecting', loc:'Pharmacy', callTrigger:Date.now()});
+                                                        if(act === 'done') db.collection("queue").doc(p.id).update({status:'finished'});
+                                                        if(act === 'del') if(confirm('Remove patient?')) db.collection("queue").doc(p.id).delete();
+                                                        e.target.value = ""; // Reset
+                                                    }}
+                                                >
+                                                    <option value="" disabled>--- SELECT ---</option>
+                                                    {view === 'doctor' && <option value="call">Call / Recall</option>}
+                                                    {view === 'doctor' && <option value="rx">Send to Pharmacy</option>}
+                                                    {view === 'pharmacy' && <option value="call">Call to Pharmacy</option>}
+                                                    {view === 'pharmacy' && <option value="done">Complete</option>}
+                                                    <option value="del">Remove Patient</option>
+                                                </select>
+                                                <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none text-[#0047AB]"><i className="ri-arrow-down-s-fill"></i></div>
                                             </div>
                                         </div>
                                     ))}
@@ -262,20 +286,33 @@
                         <div className="fixed inset-0 bg-black/80 z-[999] flex items-center justify-center p-6">
                             <div className="bg-white p-8 rounded-[2rem] w-full max-w-lg shadow-2xl">
                                 <div className="flex justify-between items-center mb-6">
-                                    <h2 className="text-2xl font-black uppercase">System Settings</h2>
+                                    <h2 className="text-2xl font-black uppercase">Settings</h2>
                                     <button onClick={()=>setShowSettings(false)} className="bg-gray-100 p-2 rounded-full"><i className="ri-close-line text-2xl"></i></button>
                                 </div>
                                 <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2 custom-scroll">
+                                    <div>
+                                        <label className="block text-xs font-black text-gray-400 uppercase mb-2">My Consultation Room</label>
+                                        <select value={myRoom} onChange={e=>setMyRoom(e.target.value)} className="w-full bg-gray-100 p-4 rounded-xl font-bold">
+                                            {config.rooms.map(r=><option key={r} value={r}>{r}</option>)}
+                                        </select>
+                                    </div>
                                     <div className="space-y-2">
-                                        <label className="block text-xs font-black text-gray-400 uppercase">Ticker Text</label>
-                                        <input className="w-full bg-gray-100 p-4 rounded-xl font-bold" value={config.tickerText} onChange={e=>db.collection("settings").doc("config").update({tickerText: e.target.value})} />
+                                        <label className="block text-xs font-black text-gray-400 uppercase">Language Mode</label>
+                                        <div className="flex gap-2">
+                                            <button onClick={()=>db.collection("settings").doc("config").update({lang:'en'})} className={`flex-1 py-3 rounded-xl font-bold ${config.lang==='en'?'bg-blue-600 text-white':'bg-gray-100 text-gray-400'}`}>English</button>
+                                            <button onClick={()=>db.collection("settings").doc("config").update({lang:'zh'})} className={`flex-1 py-3 rounded-xl font-bold ${config.lang==='zh'?'bg-blue-600 text-white':'bg-gray-100 text-gray-400'}`}>Dual (English/中文)</button>
+                                        </div>
                                     </div>
                                     <div className="space-y-2">
                                         <label className="block text-xs font-black text-gray-400 uppercase">Clinic Name</label>
                                         <input className="w-full bg-gray-100 p-4 rounded-xl font-bold" value={config.header} onChange={e=>db.collection("settings").doc("config").update({header: e.target.value})} />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="block text-xs font-black text-gray-400 uppercase">Slide Upload</label>
+                                        <label className="block text-xs font-black text-gray-400 uppercase">Consultation Rooms (Comma Separated)</label>
+                                        <input className="w-full bg-gray-100 p-4 rounded-xl font-bold" value={config.rooms.join(',')} onChange={e=>db.collection("settings").doc("config").update({rooms: e.target.value.split(',')})} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="block text-xs font-black text-gray-400 uppercase">Image Slideshow Upload</label>
                                         <input type="file" multiple className="text-sm block" onChange={(e)=>{
                                             const f = Array.from(e.target.files);
                                             Promise.all(f.map(file => new Promise(res => {
