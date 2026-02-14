@@ -18,59 +18,70 @@
         :root { --surface: #0047AB; --bg: #ffffff; --orange-panel: #FFBD70; } 
         body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: #000; height: 100vh; overflow: hidden; margin: 0; }
         
-        /* Fixed TV Grid - Ensuring no element-pushing */
+        /* Layout Grid */
         .tv-grid { 
             display: grid; 
-            grid-template-rows: minmax(500px, 1fr) auto auto; 
+            grid-template-rows: auto 1fr auto auto; 
             height: 100vh; 
-            padding: 30px; 
+            padding: 25px; 
             box-sizing: border-box; 
-            gap: 25px; 
+            gap: 20px; 
         }
         
+        /* Main Content with Enlarged Left Panel */
         .main-content-area { 
             display: grid; 
-            grid-template-columns: 420px 1fr; 
-            gap: 30px; 
-            height: 100%; /* Height is governed by parent grid-row */
-            min-height: 0; /* Important for preventing overflow growth */
+            grid-template-columns: 550px 1fr; /* Increased from 420px */
+            gap: 25px; 
+            min-height: 0; 
         }
 
-        .left-panel { display: flex; flex-direction: column; justify-content: space-between; height: 100%; }
-        .header-stack { display: flex; align-items: flex-start; gap: 15px; }
+        .left-panel { display: flex; flex-direction: column; height: 100%; }
         .footer-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
         
-        .box-blue { background: var(--surface); color: white; border-radius: 15px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
-        .box-orange { background: var(--orange-panel); color: white; border-radius: 15px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; height: 160px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+        /* Enlarged Calling Box */
+        .box-blue { 
+            background: var(--surface); 
+            color: white; 
+            border-radius: 20px; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center; 
+            text-align: center; 
+            flex: 1;
+            box-shadow: 0 20px 25px -5px rgba(0, 71, 171, 0.2);
+        }
+
+        .box-orange { background: var(--orange-panel); color: white; border-radius: 15px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; height: 140px; }
         
-        /* STRICT FIXED DIMENSION FRAME */
+        /* FIXED 16:9 SLIDESHOW FRAME */
         .slideshow-container {
             width: 100%;
-            height: 100%;
+            aspect-ratio: 16 / 9; /* Fixed Ratio */
             background: #003580;
-            border-radius: 15px;
+            border-radius: 20px;
             overflow: hidden;
             position: relative;
-            display: block; /* Lock block behavior */
+            align-self: center; /* Keeps it centered if vertical space varies */
         }
 
         .slideshow-img { 
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%; 
-            height: 100%; 
-            object-fit: cover; /* This ignores image aspect ratio to fill the fixed frame */
+            top: 0; left: 0;
+            width: 100%; height: 100%; 
+            object-fit: cover; 
+            transition: opacity 0.5s ease;
         }
 
-        .ticker-wrap { display: flex; align-items: center; overflow: hidden; height: 50px; }
-        .ticker-content { white-space: nowrap; animation: marquee 35s linear infinite; font-weight: 800; font-size: 2rem; color: #000; text-transform: uppercase; }
+        .ticker-wrap { display: flex; align-items: center; overflow: hidden; height: 60px; background: #f8f9fa; border-radius: 10px; }
+        .ticker-content { white-space: nowrap; animation: marquee 35s linear infinite; font-weight: 800; font-size: 2.2rem; color: #000; text-transform: uppercase; }
         @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
 
         .console-btn { background: #B4B4B4; color: black; font-weight: 800; padding: 8px 18px; border-radius: 8px; text-transform: uppercase; font-size: 0.8rem; }
         .console-btn.active { background: #505050; color: white; }
         
-        .action-select { background: white; color: #0047AB; font-weight: 800; padding: 10px 16px; border-radius: 10px; border: none; cursor: pointer; text-transform: uppercase; font-size: 0.8rem; appearance: none; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .action-select { background: white; color: #0047AB; font-weight: 800; padding: 10px 16px; border-radius: 10px; border: none; cursor: pointer; text-transform: uppercase; font-size: 0.8rem; appearance: none; }
         .mono-num { font-family: 'JetBrains Mono', monospace; font-weight: 800; }
     </style>
 </head>
@@ -78,6 +89,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
+        // Firebase Config and Initialization (Maintained)
         const FIREBASE_CONFIG = {
             apiKey: "AIzaSyDZ6K02v3Ovwo7xLqL4x33sIQNzv3ydXL8",
             authDomain: "queueasy-ea33b.firebaseapp.com",
@@ -109,12 +121,14 @@
             const [inputNum, setInputNum] = React.useState('');
             const [inputName, setInputName] = React.useState('');
 
+            // Data Sync
             React.useEffect(() => {
                 const unsubQ = db.collection("queue").orderBy("time", "desc").onSnapshot(s => setQueue(s.docs.map(d => ({id:d.id, ...d.data()}))));
                 const unsubC = db.collection("settings").doc("config").onSnapshot(doc => doc.exists && setConfig(prev => ({...prev, ...doc.data()})));
                 return () => { unsubQ(); unsubC(); };
             }, []);
 
+            // Slideshow Logic
             React.useEffect(() => {
                 if (slides.length > 1) {
                     const timer = setInterval(() => {
@@ -124,6 +138,7 @@
                 }
             }, [slides.length, config.slideSpeed]);
 
+            // Voice Logic
             const speakDual = (num, loc) => {
                 window.speechSynthesis.cancel();
                 const uEn = new SpeechSynthesisUtterance(`Number ${num}. Please proceed to ${loc}.`);
@@ -149,12 +164,10 @@
 
             const latestHistory = queue.filter(p => p.status === 'calling' || p.status === 'collecting').slice(0, 8).filter(p => p.id !== currentCaller?.id).slice(0, 4);
 
+            // Slideshow Upload/Delete (Maintained)
             const handleFileUpload = (e) => {
                 const files = Array.from(e.target.files);
-                if (slides.length + files.length > 5) {
-                    alert("Maximum 5 pictures allowed.");
-                    return;
-                }
+                if (slides.length + files.length > 5) { alert("Max 5 pictures."); return; }
                 files.forEach(file => {
                     const reader = new FileReader();
                     reader.onload = (ev) => {
@@ -177,12 +190,11 @@
                 <div className="flex justify-between items-start mb-4">
                     <div className="flex flex-col gap-4">
                         <div className="flex gap-2">
-                            <button onClick={() => setView('reg')} className={`console-btn ${view==='reg'?'active':''}`}>REG</button>
-                            <button onClick={() => setView('doctor')} className={`console-btn ${view==='doctor'?'active':''}`}>DOCTOR</button>
-                            <button onClick={() => setView('pharmacy')} className={`console-btn ${view==='pharmacy'?'active':''}`}>PHARMACY</button>
-                            <button onClick={() => setView('tv')} className={`console-btn ${view==='tv'?'active':''}`}>TV</button>
+                            {['reg', 'doctor', 'pharmacy', 'tv'].map(v => (
+                                <button key={v} onClick={() => setView(v)} className={`console-btn ${view===v?'active':''}`}>{v}</button>
+                            ))}
                         </div>
-                        <h2 className="text-4xl font-black text-[#0047AB] uppercase tracking-tighter">{title}</h2>
+                        <h2 className="text-4xl font-black text-[#0047AB] uppercase">{title}</h2>
                     </div>
                     <div className="flex items-center gap-6">
                         <div className="text-right">
@@ -196,38 +208,38 @@
 
             return (
                 <div className="h-screen w-screen relative overflow-hidden bg-white">
-                    {/* === TV VIEW (Strict Frame Layout) === */}
+                    {/* === TV VIEW === */}
                     {view === 'tv' && (
                         <div className="tv-grid">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <h1 className="text-5xl font-extrabold text-[#0047AB] tracking-tight">{config.header}</h1>
+                                    <div className="flex gap-4 font-bold uppercase text-lg mt-1 opacity-60">
+                                        <span>{new Date().toLocaleDateString([], {weekday: 'long', day: '2-digit', month: 'long'})}</span>
+                                        <span>{new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false})}</span>
+                                    </div>
+                                </div>
+                                <div className="flex gap-3">
+                                    {!audioUnlocked && <button onClick={() => setAudioUnlocked(true)} className="bg-red-500 text-white px-4 py-2 rounded-full text-xs font-black uppercase animate-pulse">Enable Sound</button>}
+                                    <button onClick={() => setShowSettings(true)} className="text-gray-300 hover:text-black"><i className="ri-settings-4-fill text-4xl"></i></button>
+                                </div>
+                            </div>
+
                             <div className="main-content-area">
                                 <div className="left-panel">
-                                    <div className="header-stack">
-                                        <div className="text-[#0047AB]">
-                                            <h1 className="text-4xl font-extrabold tracking-tight leading-none">{config.header}</h1>
-                                            <div className="font-bold uppercase text-lg mt-2 text-black opacity-80 leading-tight">
-                                                {new Date().toLocaleDateString([], {weekday: 'long'})}<br/>
-                                                {new Date().toLocaleDateString([], {day: '2-digit', month: 'long', year: 'numeric'})}<br/>
-                                                {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false})}
-                                            </div>
-                                        </div>
-                                        <div className="flex gap-2 mt-1">
-                                            <button onClick={() => setView('reg')} className="text-gray-300 hover:text-black"><i className="ri-home-4-fill text-3xl"></i></button>
-                                            <button onClick={() => setShowSettings(true)} className="text-gray-300 hover:text-black"><i className="ri-settings-4-fill text-3xl"></i></button>
-                                            {!audioUnlocked && <button onClick={() => setAudioUnlocked(true)} className="bg-red-500 text-white px-3 py-1 rounded-full text-[10px] font-black uppercase animate-pulse">Unmute</button>}
-                                        </div>
-                                    </div>
-                                    <div className="box-blue h-[450px] shadow-2xl overflow-hidden shrink-0">
-                                        <div className="text-3xl font-bold mb-2 tracking-[0.2em] uppercase italic opacity-70">Calling</div>
-                                        <div className="text-[180px] leading-none mono-num mb-4">{currentCaller ? currentCaller.num : "##"}</div>
-                                        <div className="text-5xl font-black uppercase tracking-widest">{currentCaller ? currentCaller.loc : "Location"}</div>
+                                    <div className="box-blue">
+                                        <div className="text-4xl font-bold mb-4 tracking-[0.2em] uppercase italic opacity-60">Calling</div>
+                                        {/* Enlarged Number Display */}
+                                        <div className="text-[240px] leading-[0.8] mono-num mb-8">{currentCaller ? currentCaller.num : "##"}</div>
+                                        <div className="text-6xl font-black uppercase tracking-widest bg-white/10 px-8 py-4 rounded-2xl w-full">{currentCaller ? currentCaller.loc : "Location"}</div>
                                     </div>
                                 </div>
 
-                                <div className="slideshow-container shadow-2xl">
+                                <div className="slideshow-container shadow-2xl border-4 border-gray-50">
                                     {slides.length > 0 ? (
                                         <img src={slides[slideIndex]} className="slideshow-img" key={slideIndex} />
                                     ) : (
-                                        <div className="flex h-full items-center justify-center text-white/20 text-3xl font-bold uppercase">No Images Uploaded</div>
+                                        <div className="flex h-full items-center justify-center text-white/20 text-4xl font-bold uppercase">Clinical Gallery</div>
                                     )}
                                 </div>
                             </div>
@@ -236,9 +248,9 @@
                                 {[0,1,2,3].map(i => {
                                     const item = latestHistory[i];
                                     return (
-                                        <div key={i} className="box-orange">
+                                        <div key={i} className="box-orange shadow-lg">
                                             <div className="text-6xl font-black mono-num mb-1">{item ? item.num : "##"}</div>
-                                            <div className="text-xl font-bold uppercase tracking-wider opacity-80">{item ? (item.status === 'collecting' ? 'Pharmacy' : item.loc) : "Location"}</div>
+                                            <div className="text-lg font-bold uppercase tracking-wider opacity-80">{item ? (item.status === 'collecting' ? 'Pharmacy' : item.loc) : "History"}</div>
                                         </div>
                                     );
                                 })}
@@ -247,13 +259,13 @@
                         </div>
                     )}
 
-                    {/* === DOCTOR/PHARMACY CONSOLES (Maintained) === */}
+                    {/* === CONSOLES & REG (Maintained) === */}
                     {(view === 'doctor' || view === 'pharmacy') && (
                         <div className="p-8 h-full flex flex-col">
-                            {renderHeader(view === 'doctor' ? "Doctor Console" : "Pharmacy Console")}
+                            {renderHeader(view.toUpperCase() + " CONSOLE")}
                             <div className={`flex-1 ${view === 'doctor' ? 'bg-[#0047AB]' : 'bg-[#F28C28]'} rounded-[2.5rem] p-8 overflow-hidden flex flex-col shadow-2xl`}>
                                 <div className="grid grid-cols-5 text-white font-black text-lg mb-6 px-6 uppercase opacity-80">
-                                    <span>Number</span><span>Name</span><span>Location</span><span>Status</span><span className="text-right pr-4">Action</span>
+                                    <span>Number</span><span>Name</span><span>Location</span><span>Status</span><span className="text-right">Action</span>
                                 </div>
                                 <div className="flex-1 overflow-y-auto space-y-3 pr-2">
                                     {queue.filter(p => view === 'doctor' ? (p.status === 'waiting' || p.status === 'calling') : p.status === 'collecting').map(p => (
@@ -262,7 +274,7 @@
                                             <span className="font-bold truncate text-lg uppercase">{p.name}</span>
                                             <span className="uppercase text-sm font-bold opacity-70">{p.loc}</span>
                                             <span className="uppercase text-xs font-black bg-black/30 py-1 px-4 rounded-full w-fit">{p.status}</span>
-                                            <div className="flex justify-end pr-4">
+                                            <div className="flex justify-end">
                                                 <select className="action-select outline-none" defaultValue="" onChange={(e) => {
                                                     const act = e.target.value;
                                                     if(act === 'call') db.collection("queue").doc(p.id).update({status:'calling', loc: (view === 'doctor' ? myRoom : 'PHARMACY'), callTrigger:Date.now()});
@@ -271,10 +283,10 @@
                                                     if(act === 'del') if(confirm('Remove?')) db.collection("queue").doc(p.id).delete();
                                                     e.target.value = "";
                                                 }}>
-                                                    <option value="" disabled>--- SELECT ---</option>
-                                                    <option value="call">{view === 'doctor' ? 'Call Patient' : 'Call for Collection'}</option>
-                                                    {view === 'doctor' && <option value="rx">Send to Pharmacy</option>}
-                                                    {view === 'pharmacy' && <option value="done">Dispensed/Done</option>}
+                                                    <option value="" disabled>SELECT ACTION</option>
+                                                    <option value="call">Call Patient</option>
+                                                    {view === 'doctor' && <option value="rx">To Pharmacy</option>}
+                                                    {view === 'pharmacy' && <option value="done">Complete</option>}
                                                     <option value="del">Remove</option>
                                                 </select>
                                             </div>
@@ -285,10 +297,9 @@
                         </div>
                     )}
 
-                    {/* === REGISTRATION (Maintained) === */}
                     {view === 'reg' && (
                         <div className="p-8 h-full flex flex-col">
-                            {renderHeader("HOME")}
+                            {renderHeader("HOME / REGISTRATION")}
                             <div className="flex-1 grid grid-cols-12 gap-8 overflow-hidden">
                                 <div className="col-span-4 bg-[#F28C28] rounded-[2rem] p-10 flex flex-col items-center shadow-lg">
                                     <div className="w-full space-y-8">
@@ -300,67 +311,49 @@
                                             <label className="block text-white font-bold text-xl mb-3 uppercase">Name</label>
                                             <input type="text" value={inputName} onChange={e=>setInputName(e.target.value)} placeholder="PATIENT NAME" className="w-full bg-white rounded-2xl py-4 text-center text-xl font-bold outline-none uppercase"/>
                                         </div>
-                                        <div className="space-y-3 pt-4">
-                                            <button onClick={() => {
-                                                const n = inputNum || (queue.length ? Math.max(...queue.map(p=>parseInt(p.num)||0))+1 : 1001);
-                                                db.collection("queue").add({num:n, name:inputName||'Patient', status:'waiting', time:Date.now(), loc:'-'});
-                                                setInputNum(''); setInputName('');
-                                            }} className="w-full bg-white text-[#F28C28] py-4 rounded-2xl text-xl font-black uppercase shadow-md">Add to que</button>
-                                            <button onClick={() => alert('Print triggered')} className="w-full bg-white text-[#F28C28] py-4 rounded-2xl text-xl font-black uppercase shadow-md">Print ticket</button>
-                                        </div>
+                                        <button onClick={() => {
+                                            const n = inputNum || (queue.length ? Math.max(...queue.map(p=>parseInt(p.num)||0))+1 : 1001);
+                                            db.collection("queue").add({num:n, name:inputName||'Patient', status:'waiting', time:Date.now(), loc:'-'});
+                                            setInputNum(''); setInputName('');
+                                        }} className="w-full bg-white text-[#F28C28] py-4 rounded-2xl text-xl font-black uppercase">Add to que</button>
                                     </div>
                                 </div>
-                                <div className="col-span-8 flex flex-col overflow-hidden">
-                                    <h3 className="text-3xl font-black text-gray-300 mb-4 ml-4 uppercase">Live Que</h3>
-                                    <div className="flex-1 bg-[#FFD580] rounded-[2rem] p-8 flex flex-col shadow-inner overflow-hidden">
-                                        <div className="grid grid-cols-2 text-black/80 font-black text-xl border-b-2 border-black/10 pb-4 mb-4 px-4 uppercase">
-                                            <span>Number</span><span>Location</span>
-                                        </div>
-                                        <div className="flex-1 overflow-y-auto pr-4 space-y-3">
-                                            {queue.filter(p => p.status !== 'finished').map(p => (
-                                                <div key={p.id} className="grid grid-cols-2 items-center bg-white/40 p-5 rounded-2xl">
-                                                    <span className="text-3xl font-black mono-num">{p.num}</span>
-                                                    <span className="text-xl font-bold uppercase text-black/60">{p.status === 'calling' ? p.loc : (p.status === 'collecting' ? 'PHARMACY' : 'WAITING')}</span>
-                                                </div>
-                                            ))}
-                                        </div>
+                                <div className="col-span-8 flex flex-col overflow-hidden bg-[#FFD580] rounded-[2rem] p-8">
+                                    <h3 className="text-2xl font-black mb-4 uppercase">Live Registry</h3>
+                                    <div className="flex-1 overflow-y-auto space-y-3">
+                                        {queue.filter(p => p.status !== 'finished').map(p => (
+                                            <div key={p.id} className="grid grid-cols-2 bg-white/40 p-5 rounded-2xl">
+                                                <span className="text-3xl font-black mono-num">{p.num}</span>
+                                                <span className="text-xl font-bold uppercase text-black/60">{p.status}</span>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* === SETTINGS OVERLAY === */}
+                    {/* === SETTINGS (Maintained) === */}
                     {showSettings && (
                         <div className="fixed inset-0 bg-black/80 z-[999] flex items-center justify-center p-6">
-                            <div className="bg-white p-8 rounded-[2rem] w-full max-w-2xl shadow-2xl">
+                            <div className="bg-white p-8 rounded-[2rem] w-full max-w-2xl">
                                 <div className="flex justify-between items-center mb-6">
-                                    <h2 className="text-2xl font-black uppercase tracking-tighter">System Refinement</h2>
+                                    <h2 className="text-2xl font-black uppercase">System Refinement</h2>
                                     <button onClick={()=>setShowSettings(false)} className="bg-gray-100 p-2 rounded-full"><i className="ri-close-line text-2xl"></i></button>
                                 </div>
-                                <div className="grid grid-cols-2 gap-8 max-h-[70vh] overflow-y-auto pr-2">
+                                <div className="grid grid-cols-2 gap-8 max-h-[70vh] overflow-y-auto">
                                     <div className="space-y-6">
-                                        <h3 className="font-black text-blue-600 uppercase text-xs border-b pb-1">Slideshow Settings</h3>
+                                        <h3 className="font-black text-blue-600 uppercase text-xs border-b pb-1">Slideshow Control</h3>
+                                        <select value={config.slideSpeed} onChange={e=>db.collection("settings").doc("config").update({slideSpeed: parseInt(e.target.value)})} className="w-full bg-gray-100 p-4 rounded-xl font-bold">
+                                            <option value={3000}>3 Seconds</option>
+                                            <option value={5000}>5 Seconds</option>
+                                            <option value={10000}>10 Seconds</option>
+                                        </select>
                                         <div>
-                                            <label className="block text-[10px] font-black text-gray-400 uppercase mb-2">Slide Interval</label>
-                                            <select 
-                                                value={config.slideSpeed} 
-                                                onChange={e=>db.collection("settings").doc("config").update({slideSpeed: parseInt(e.target.value)})}
-                                                className="w-full bg-gray-100 p-4 rounded-xl font-bold appearance-none"
-                                            >
-                                                <option value={3000}>3 Seconds</option>
-                                                <option value={5000}>5 Seconds</option>
-                                                <option value={10000}>10 Seconds</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-[10px] font-black text-gray-400 uppercase mb-2">Upload Images ({slides.length}/5)</label>
-                                            {slides.length < 5 && (
-                                                <input type="file" multiple accept="image/*" onChange={handleFileUpload} className="text-xs font-bold text-gray-500" />
-                                            )}
-                                            <div className="mt-4 grid grid-cols-5 gap-2">
+                                            <input type="file" multiple accept="image/*" onChange={handleFileUpload} className="text-xs mb-4" />
+                                            <div className="grid grid-cols-5 gap-2">
                                                 {slides.map((s, i) => (
-                                                    <div key={i} className="relative group aspect-square rounded-lg overflow-hidden bg-gray-100">
+                                                    <div key={i} className="relative group aspect-square rounded bg-gray-100 overflow-hidden">
                                                         <img src={s} className="w-full h-full object-cover" />
                                                         <button onClick={()=>deleteSlide(i)} className="absolute inset-0 bg-red-500/80 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"><i className="ri-delete-bin-line text-xl"></i></button>
                                                     </div>
@@ -368,22 +361,11 @@
                                             </div>
                                         </div>
                                     </div>
-
-                                    <div className="space-y-6">
+                                    <div className="space-y-4">
                                         <h3 className="font-black text-blue-600 uppercase text-xs border-b pb-1">Clinic Info</h3>
-                                        <div>
-                                            <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Clinic Name</label>
-                                            <input className="w-full bg-gray-100 p-4 rounded-xl font-bold" value={config.header} onChange={e=>db.collection("settings").doc("config").update({header: e.target.value})} />
-                                        </div>
-                                        <div>
-                                            <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Ticker Message</label>
-                                            <input className="w-full bg-gray-100 p-4 rounded-xl font-bold" value={config.tickerText} onChange={e=>db.collection("settings").doc("config").update({tickerText: e.target.value})} />
-                                        </div>
-                                        <div>
-                                            <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Rooms (Comma Separated)</label>
-                                            <input className="w-full bg-gray-100 p-4 rounded-xl font-bold text-sm" value={config.rooms.join(',')} onChange={e=>db.collection("settings").doc("config").update({rooms: e.target.value.split(',')})} />
-                                        </div>
-                                        <button onClick={()=>{ if(confirm('Wipe all records?')) queue.forEach(p=>db.collection("queue").doc(p.id).delete()) }} className="w-full bg-red-50 text-red-500 py-4 rounded-xl font-black text-[10px] uppercase mt-4">Reset Queue</button>
+                                        <input className="w-full bg-gray-100 p-4 rounded-xl font-bold" value={config.header} onChange={e=>db.collection("settings").doc("config").update({header: e.target.value})} />
+                                        <input className="w-full bg-gray-100 p-4 rounded-xl font-bold" value={config.tickerText} onChange={e=>db.collection("settings").doc("config").update({tickerText: e.target.value})} />
+                                        <button onClick={()=>{ if(confirm('Wipe queue?')) queue.forEach(p=>db.collection("queue").doc(p.id).delete()) }} className="w-full bg-red-50 text-red-500 py-4 rounded-xl font-black uppercase text-[10px]">Reset System</button>
                                     </div>
                                 </div>
                             </div>
