@@ -18,9 +18,10 @@
         :root { --surface: #0047AB; --bg: #ffffff; --orange-panel: #FFBD70; } 
         body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: #000; height: 100vh; overflow: hidden; margin: 0; }
         
+        /* Fixed TV Grid - Ensuring no element-pushing */
         .tv-grid { 
             display: grid; 
-            grid-template-rows: 1fr auto auto; 
+            grid-template-rows: minmax(500px, 1fr) auto auto; 
             height: 100vh; 
             padding: 30px; 
             box-sizing: border-box; 
@@ -31,17 +32,18 @@
             display: grid; 
             grid-template-columns: 420px 1fr; 
             gap: 30px; 
-            height: 100%;
+            height: 100%; /* Height is governed by parent grid-row */
+            min-height: 0; /* Important for preventing overflow growth */
         }
 
-        .left-panel { display: flex; flex-direction: column; justify-content: space-between; }
+        .left-panel { display: flex; flex-direction: column; justify-content: space-between; height: 100%; }
         .header-stack { display: flex; align-items: flex-start; gap: 15px; }
         .footer-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
         
         .box-blue { background: var(--surface); color: white; border-radius: 15px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
         .box-orange { background: var(--orange-panel); color: white; border-radius: 15px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; height: 160px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
         
-        /* Fixed Slideshow Frame */
+        /* STRICT FIXED DIMENSION FRAME */
         .slideshow-container {
             width: 100%;
             height: 100%;
@@ -49,13 +51,16 @@
             border-radius: 15px;
             overflow: hidden;
             position: relative;
+            display: block; /* Lock block behavior */
         }
 
         .slideshow-img { 
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%; 
             height: 100%; 
-            object-fit: cover; /* Ensures image fills frame regardless of original size */
-            transition: opacity 0.5s ease-in-out;
+            object-fit: cover; /* This ignores image aspect ratio to fill the fixed frame */
         }
 
         .ticker-wrap { display: flex; align-items: center; overflow: hidden; height: 50px; }
@@ -110,7 +115,6 @@
                 return () => { unsubQ(); unsubC(); };
             }, []);
 
-            // Slideshow Timer
             React.useEffect(() => {
                 if (slides.length > 1) {
                     const timer = setInterval(() => {
@@ -120,7 +124,6 @@
                 }
             }, [slides.length, config.slideSpeed]);
 
-            // Announcement logic (Maintained)
             const speakDual = (num, loc) => {
                 window.speechSynthesis.cancel();
                 const uEn = new SpeechSynthesisUtterance(`Number ${num}. Please proceed to ${loc}.`);
@@ -179,7 +182,7 @@
                             <button onClick={() => setView('pharmacy')} className={`console-btn ${view==='pharmacy'?'active':''}`}>PHARMACY</button>
                             <button onClick={() => setView('tv')} className={`console-btn ${view==='tv'?'active':''}`}>TV</button>
                         </div>
-                        <h2 className="text-4xl font-black text-[#0047AB] uppercase">{title}</h2>
+                        <h2 className="text-4xl font-black text-[#0047AB] uppercase tracking-tighter">{title}</h2>
                     </div>
                     <div className="flex items-center gap-6">
                         <div className="text-right">
@@ -193,7 +196,7 @@
 
             return (
                 <div className="h-screen w-screen relative overflow-hidden bg-white">
-                    {/* === TV VIEW === */}
+                    {/* === TV VIEW (Strict Frame Layout) === */}
                     {view === 'tv' && (
                         <div className="tv-grid">
                             <div className="main-content-area">
@@ -213,7 +216,7 @@
                                             {!audioUnlocked && <button onClick={() => setAudioUnlocked(true)} className="bg-red-500 text-white px-3 py-1 rounded-full text-[10px] font-black uppercase animate-pulse">Unmute</button>}
                                         </div>
                                     </div>
-                                    <div className="box-blue h-[450px] shadow-2xl">
+                                    <div className="box-blue h-[450px] shadow-2xl overflow-hidden shrink-0">
                                         <div className="text-3xl font-bold mb-2 tracking-[0.2em] uppercase italic opacity-70">Calling</div>
                                         <div className="text-[180px] leading-none mono-num mb-4">{currentCaller ? currentCaller.num : "##"}</div>
                                         <div className="text-5xl font-black uppercase tracking-widest">{currentCaller ? currentCaller.loc : "Location"}</div>
@@ -327,7 +330,7 @@
                         </div>
                     )}
 
-                    {/* === UPDATED SETTINGS OVERLAY === */}
+                    {/* === SETTINGS OVERLAY === */}
                     {showSettings && (
                         <div className="fixed inset-0 bg-black/80 z-[999] flex items-center justify-center p-6">
                             <div className="bg-white p-8 rounded-[2rem] w-full max-w-2xl shadow-2xl">
@@ -353,11 +356,11 @@
                                         <div>
                                             <label className="block text-[10px] font-black text-gray-400 uppercase mb-2">Upload Images ({slides.length}/5)</label>
                                             {slides.length < 5 && (
-                                                <input type="file" multiple accept="image/*" onChange={handleFileUpload} className="text-xs font-bold text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-black file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer" />
+                                                <input type="file" multiple accept="image/*" onChange={handleFileUpload} className="text-xs font-bold text-gray-500" />
                                             )}
                                             <div className="mt-4 grid grid-cols-5 gap-2">
                                                 {slides.map((s, i) => (
-                                                    <div key={i} className="relative group aspect-square rounded-lg overflow-hidden bg-gray-100 border-2 border-gray-100">
+                                                    <div key={i} className="relative group aspect-square rounded-lg overflow-hidden bg-gray-100">
                                                         <img src={s} className="w-full h-full object-cover" />
                                                         <button onClick={()=>deleteSlide(i)} className="absolute inset-0 bg-red-500/80 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"><i className="ri-delete-bin-line text-xl"></i></button>
                                                     </div>
@@ -380,7 +383,7 @@
                                             <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Rooms (Comma Separated)</label>
                                             <input className="w-full bg-gray-100 p-4 rounded-xl font-bold text-sm" value={config.rooms.join(',')} onChange={e=>db.collection("settings").doc("config").update({rooms: e.target.value.split(',')})} />
                                         </div>
-                                        <button onClick={()=>{ if(confirm('Wipe all records?')) queue.forEach(p=>db.collection("queue").doc(p.id).delete()) }} className="w-full bg-red-50 text-red-500 py-4 rounded-xl font-black text-[10px] uppercase mt-4">Reset System Queue</button>
+                                        <button onClick={()=>{ if(confirm('Wipe all records?')) queue.forEach(p=>db.collection("queue").doc(p.id).delete()) }} className="w-full bg-red-50 text-red-500 py-4 rounded-xl font-black text-[10px] uppercase mt-4">Reset Queue</button>
                                     </div>
                                 </div>
                             </div>
